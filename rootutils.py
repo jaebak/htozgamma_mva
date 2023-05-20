@@ -30,3 +30,9 @@ def set_max(maximum):
 def set_max_th1(max_fraction = 1.05):
   maximum = get_max_th1() * max_fraction
   set_max(maximum)
+
+import unicodedata
+import re
+def slugify(string):
+  return re.sub(r'[-\s]+', '-',re.sub(r'[^\w\s-]', '',
+                  unicodedata.normalize('NFKD', string)).strip().lower())

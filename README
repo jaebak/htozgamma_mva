@@ -6,6 +6,8 @@ pip3 install --upgrade pip
 pip3 install torch torchvision torchaudio
 pip3 install uproot numpy scikit-learn matplotlib
 pip3 install jupyterlab
+pip3 install xgboost slugify
+pip3 install tensorboard
 
 1. Run zgamma_preprocess.py
   Output: 
@@ -31,3 +33,7 @@ pip3 install jupyterlab
   Input: 
   - signal + bkg test sample
   Output: root that has test_tree and train_tree
+
+5. Train nn with train_nn,py. 
+
+6. Train bdt with train_bdt.py.

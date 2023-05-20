@@ -202,13 +202,15 @@ def train_nn(tmva_filename):
 
   layoutString = TString("Layout=TANH|40,LINEAR")
   #trainingString = TString("LearningRate=1e-6,ConvergenceSteps=100,BatchSize=1,TestRepetitions=10,MaxEpochs=3000")
-  trainingString = TString("LearningRate=1e-6,ConvergenceSteps=100,BatchSize=1,TestRepetitions=10,MaxEpochs=80000")
+  #trainingString = TString("LearningRate=1e-6,ConvergenceSteps=100,BatchSize=1,TestRepetitions=10,MaxEpochs=80000")
+  trainingString = TString("LearningRate=1e-6,ConvergenceSteps=100,BatchSize=1,TestRepetitions=10,MaxEpochs=100")
   trainingStrategyString = TString("TrainingStrategy=")
   trainingStrategyString += trainingString;
   dnnOptionString = TString("!H:V:ErrorStrategy=CROSSENTROPY:VarTransform=N:WeightInitialization=XAVIERUNIFORM")
   dnnOptionString.Append (":"); dnnOptionString.Append (layoutString);
   dnnOptionString.Append (":"); dnnOptionString.Append (trainingStrategyString);
   cpuOptionString = dnnOptionString + TString(":Architecture=CPU")
+  #cpuOptionString = dnnOptionString + TString(":Architecture=GPU")
 
   factory.BookMethod(dataloader,TMVA.Types.kDL,"DNN",cpuOptionString);
   factory.TrainAllMethods();

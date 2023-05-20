@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import ROOT
+ROOT.gROOT.SetBatch(ROOT.kTRUE)
 import math
 import numpy as np
 from RootDataset import RootDataset
@@ -7,8 +8,9 @@ import sklearn.metrics
 import uproot
 import matplotlib.pyplot as plt
 import array
-import slugify
+#import slugify
 import rootutils
+import ctypes
 
 def find_signal_fraction_thresholds(signal_fractions, tmva_chain, mass_name, mva_name, label_name, weight_name = ''):
   ## Find MVA threshold where signal is the below fractions
@@ -382,7 +384,7 @@ def evaluate_overtraining(info_mvas):
     box.SetFillColorAlpha(0,0)
     box.AddText('#chi^{2} test p-value signal: '+f'{pvalue_signal:.3f} bkg: {pvalue_bkg:.3f}')
     box.Draw()
-    c1.SaveAs('plots/overtrain_'+slugify.slugify(mva_info['name'])+'.pdf')
+    c1.SaveAs('plots/overtrain_'+rootutils.slugify(mva_info['name'])+'.pdf')
     ROOT.gStyle.SetOptStat(1)
 
     test_root_file.Close()
@@ -405,6 +407,9 @@ def evaluate_significance_with_resolution(info_mvas, draw=True, tree_type='test_
   resolution_graphs = {}
   best_significances = []
   purity_sigeff70s = []
+  significance_min_max = []
+  purity_min_max = []
+  resolution_min_max = []
   for mva_info in info_mvas:
     tree_name = mva_info['names'][tree_type]
     if tree_type == 'train_tree': tmva_filename = mva_info['names']['train_filename']
@@ -489,6 +494,25 @@ def evaluate_significance_with_resolution(info_mvas, draw=True, tree_type='test_
     purity_graphs[mva_tag] = purity_graph
     resolution_graph = ROOT.TGraph(len(signal_fractions), x_array, resolution_arrays[mva_tag])
     resolution_graphs[mva_tag] = resolution_graph
+    # Find min max of graph
+    x_min, x_max, y_min, y_max = ctypes.c_double(), ctypes.c_double(), ctypes.c_double(), ctypes.c_double()
+    significance_graph.ComputeRange(x_min, y_min, x_max, y_max)
+    if len(significance_min_max) == 0: significance_min_max = [y_min.value, y_max.value]
+    else: 
+      if y_min.value < significance_min_max[0]: significance_min_max[0] = y_min.value
+      if y_max.value > significance_min_max[1]: significance_min_max[1] = y_max.value
+    #print(f'y_min: {y_min}, y_max: {y_max}, min_max[0]: {significance_min_max[0]}, min_max[1]: {significance_min_max[1]}')
+    purity_graph.ComputeRange(x_min, y_min, x_max, y_max)
+    if len(purity_min_max) == 0: purity_min_max = [y_min.value, y_max.value]
+    else: 
+      if y_min.value < purity_min_max[0]: purity_min_max[0] = y_min.value
+      if y_max.value > purity_min_max[1]: purity_min_max[1] = y_max.value
+    resolution_graph.ComputeRange(x_min, y_min, x_max, y_max)
+    if len(resolution_min_max) == 0: resolution_min_max = [y_min.value, y_max.value]
+    else: 
+      if y_min.value < resolution_min_max[0]: resolution_min_max[0] = y_min.value
+      if y_max.value > resolution_min_max[1]: resolution_min_max[1] = y_max.value
+    #print(f'y_min: {y_min}, y_max: {y_max}, min_max[0]: {purity_min_max[0]}, min_max[1]: {purity_min_max[1]}')
   # Draw graphs
   if draw:
     c1 = rootutils.new_canvas()
@@ -502,7 +526,7 @@ def evaluate_significance_with_resolution(info_mvas, draw=True, tree_type='test_
       significance_graphs[mva_tag].SetMarkerColor(colors[iMva])
       significance_graphs[mva_tag].SetMarkerStyle(21)
       significance_graphs[mva_tag].SetMarkerSize(0.3)
-      significance_graphs[mva_tag].GetYaxis().SetRangeUser(0, 0.07)
+      significance_graphs[mva_tag].GetYaxis().SetRangeUser(significance_min_max[0]-0.01, significance_min_max[1]+0.01)
       significance_legend.AddEntry(significance_graphs[mva_tag])
       significance_legend.Draw()
     c1.SaveAs('plots/significances_with_resolution.pdf')
@@ -518,7 +542,7 @@ def evaluate_significance_with_resolution(info_mvas, draw=True, tree_type='test_
       purity_graphs[mva_tag].SetMarkerColor(colors[iMva])
       purity_graphs[mva_tag].SetMarkerStyle(21)
       purity_graphs[mva_tag].SetMarkerSize(0.3)
-      purity_graphs[mva_tag].GetYaxis().SetRangeUser(0, 0.02)
+      purity_graphs[mva_tag].GetYaxis().SetRangeUser(0, purity_min_max[1]+0.01)
       purity_legend.AddEntry(purity_graphs[mva_tag])
       purity_legend.Draw()
     c2.SaveAs('plots/purity_with_resolution.pdf')
@@ -534,7 +558,7 @@ def evaluate_significance_with_resolution(info_mvas, draw=True, tree_type='test_
       resolution_graphs[mva_tag].SetMarkerColor(colors[iMva])
       resolution_graphs[mva_tag].SetMarkerStyle(21)
       resolution_graphs[mva_tag].SetMarkerSize(0.3)
-      resolution_graphs[mva_tag].GetYaxis().SetRangeUser(1.0, 3.5)
+      resolution_graphs[mva_tag].GetYaxis().SetRangeUser(resolution_min_max[0]-0.1, resolution_min_max[1]+0.1)
       resolution_legend.AddEntry(resolution_graphs[mva_tag])
       resolution_legend.Draw()
     c3.SaveAs('plots/signal_resolution.pdf')
@@ -554,6 +578,8 @@ def evaluate_significance(info_mvas, draw=True, tree_type='test_tree'):
   purity_graphs = {}
   best_significances = []
   purity_sigeff70s = []
+  significance_min_max = []
+  purity_min_max = []
   for mva_info in info_mvas:
     tree_name = mva_info['names'][tree_type]
     if tree_type == 'train_tree': tmva_filename = mva_info['names']['train_filename']
@@ -624,6 +650,19 @@ def evaluate_significance(info_mvas, draw=True, tree_type='test_tree'):
     significance_graphs[mva_tag] = significance_graph
     purity_graph = ROOT.TGraph(len(signal_fractions), x_array, purity_arrays[mva_tag])
     purity_graphs[mva_tag] = purity_graph
+    # Find min max of graph
+    x_min, x_max, y_min, y_max = ctypes.c_double(), ctypes.c_double(), ctypes.c_double(), ctypes.c_double()
+    significance_graph.ComputeRange(x_min, y_min, x_max, y_max)
+    if len(significance_min_max) == 0: significance_min_max = [y_min.value, y_max.value]
+    else: 
+      if y_min.value < significance_min_max[0]: significance_min_max[0] = y_min.value
+      if y_max.value > significance_min_max[1]: significance_min_max[1] = y_max.value
+    #print(f'y_min: {y_min}, y_max: {y_max}, min_max[0]: {significance_min_max[0]}, min_max[1]: {significance_min_max[1]}')
+    purity_graph.ComputeRange(x_min, y_min, x_max, y_max)
+    if len(purity_min_max) == 0: purity_min_max = [y_min.value, y_max.value]
+    else: 
+      if y_min.value < purity_min_max[0]: purity_min_max[0] = y_min.value
+      if y_max.value > purity_min_max[1]: purity_min_max[1] = y_max.value
   # Draw graphs
   if draw:
     c1 = ROOT.TCanvas('c1', 'c1', 500, 500)
@@ -637,7 +676,7 @@ def evaluate_significance(info_mvas, draw=True, tree_type='test_tree'):
       significance_graphs[mva_tag].SetMarkerColor(colors[iMva])
       significance_graphs[mva_tag].SetMarkerStyle(21)
       significance_graphs[mva_tag].SetMarkerSize(0.3)
-      significance_graphs[mva_tag].GetYaxis().SetRangeUser(0, 0.07)
+      significance_graphs[mva_tag].GetYaxis().SetRangeUser(significance_min_max[0]-0.01, significance_min_max[1]+0.01)
       significance_legend.AddEntry(significance_graphs[mva_tag])
       significance_legend.Draw()
     c1.SaveAs('plots/significances.pdf')
@@ -653,7 +692,7 @@ def evaluate_significance(info_mvas, draw=True, tree_type='test_tree'):
       purity_graphs[mva_tag].SetMarkerColor(colors[iMva])
       purity_graphs[mva_tag].SetMarkerStyle(21)
       purity_graphs[mva_tag].SetMarkerSize(0.3)
-      purity_graphs[mva_tag].GetYaxis().SetRangeUser(0, 0.02)
+      purity_graphs[mva_tag].GetYaxis().SetRangeUser(0, purity_min_max[1]+0.01)
       purity_legend.AddEntry(purity_graphs[mva_tag])
       purity_legend.Draw()
     c2.SaveAs('plots/purity.pdf')
@@ -733,7 +772,7 @@ def evaluate_correlation(info_mvas, draw=True, tree_type='test_tree'):
       box.AddText(f'Mean stdev: {np.mean(std_values):.5f}')
       box.Draw()
       rootutils.set_max_th1()
-      c1.SaveAs("plots/bkg_hist_mva_"+slugify.slugify(mva_tag)+".pdf")
+      c1.SaveAs("plots/bkg_hist_mva_"+rootutils.slugify(mva_tag)+".pdf")
 
       # signal
       c2 = rootutils.new_canvas()
@@ -747,7 +786,7 @@ def evaluate_correlation(info_mvas, draw=True, tree_type='test_tree'):
         legend.AddEntry(hist)
       legend.Draw()
       rootutils.set_max_th1()
-      c2.SaveAs("plots/signal_hist_mva_"+slugify.slugify(mva_tag)+".pdf")
+      c2.SaveAs("plots/signal_hist_mva_"+rootutils.slugify(mva_tag)+".pdf")
       ROOT.gStyle.SetOptStat(1)
 
   return std_divs
@@ -770,21 +809,22 @@ if __name__ == "__main__":
   #fine_nn_batch32_loss_z = load_mva_dict('ntuples_mva/fine_nn_loss2_batch32.root', 'fine nn loss z (batch=32)')
   #fine_nn_batch32_loss_purity = load_mva_dict('ntuples_mva/fine_nn_loss3_batch32.root', 'fine nn loss purity (batch=32)')
   #fine_nn_batch128_loss_z = load_mva_dict('ntuples_mva/fine_nn_loss2_batch128.root', 'fine nn loss z (batch=128)')
-  fine_nn_batch128_loss_signi_res = load_mva_dict('ntuples_mva/fine_nn_loss100_batch128.root', 'fine nn res loss (batch=128)')
+  #fine_nn_batch128_loss_signi_res = load_mva_dict('ntuples_mva/fine_nn_loss100_batch128.root', 'fine nn res loss (batch=128)')
   #test_mva = load_mva_dict('nn_evaluate.root', 'test mva')
 
   #info_mvas = [tmva_bdt, tmva_nn, gbdt, xgbdt, torch_nn, fine_nn, torch_nn_batch32, fine_nn_batch32]
   #info_mvas = [tmva_bdt, tmva_nn, gbdt, xgbdt, torch_nn_batch32, fine_nn]
   #info_mvas = [tmva_bdt, torch_nn_batch32]
-  info_mvas = [tmva_bdt, tmva_nn, fine_nn_batch128_loss_signi_res, gbdt, xgbdt]
+  #info_mvas = [tmva_bdt, tmva_nn, fine_nn_batch128_loss_signi_res, gbdt, xgbdt]
+  info_mvas = [tmva_bdt, tmva_nn, gbdt, xgbdt]
   #info_mvas = [tmva_nn, fine_nn_batch32, fine_nn_batch32_loss_signi, fine_nn_batch32_loss_z, fine_nn_batch32_loss_purity]
   #info_mvas = [tmva_bdt, tmva_nn, fine_nn_batch128_loss_z, fine_nn_batch128_loss_signi_res, test_mva]
   #info_mvas = [tmva_bdt, tmva_nn, gbdt, xgbdt, fine_nn_batch128_loss_signi_res]
 
-  evaluate_roc(info_mvas) # unweighted roc because of negative weights
-  evaluate_overtraining(info_mvas)
+  #evaluate_roc(info_mvas) # unweighted roc because of negative weights
+  #evaluate_overtraining(info_mvas)
   evaluate_significance_with_resolution(info_mvas, tree_type='test_full_tree')
   evaluate_significance(info_mvas, tree_type='test_full_tree')
-  evaluate_correlation(info_mvas, tree_type='test_full_tree')
+  #evaluate_correlation(info_mvas, tree_type='test_full_tree')
 
 

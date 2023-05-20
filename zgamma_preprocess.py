@@ -124,13 +124,19 @@ if __name__=='__main__':
       'phi','photon_res','photon_rapidity','l1_rapidity','l2_rapidity','decorr_photon_pt','photon_pt_mass','w_lumi', 'llg_mass', 'llg_mass_err', 'llg_flavor', 'gamma_pt')
   #define drmax, pt_mass, first index
   #make n-tuples
-  write_ntuples(['/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*GluGluHToZG*.root'],
+  #signal_files = '/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*GluGluHToZG*.root'
+  #bkg_1_files = '/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*DYJetsToLL_M-50*madgraphMLM*.root'
+  #bkg_2_files = '/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*ZGToLLG_01J_5f*.root'
+  signal_files = '/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*GluGluHToZG*.root'
+  bkg_1_files = '/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*DYJetsToLL_M-50*madgraphMLM*.root'
+  bkg_2_files = '/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*ZGToLLG_01J_5f*.root'
+  write_ntuples([signal_files],
       cuts,
       'ntuples/train_decorr_sig.root',
       defines,
       'tree',
       branches)
-  write_ntuples(['/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*DYJetsToLL_M-50*madgraphMLM*.root','/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*ZGToLLG_01J_5f*.root'],
+  write_ntuples([bkg_1_files, bkg_2_files],
       cuts,
       'ntuples/train_decorr_bak.root',
       defines,

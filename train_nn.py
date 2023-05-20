@@ -424,10 +424,10 @@ def evaluate_sample(dataloader, device, model, loss_fn, use_weight_in_loss = Fal
             resolution = (X[:,5]+1)*(normalize_max_min[5][1]-normalize_max_min[5][0])/2+normalize_max_min[5][0]
             loss += loss_fn(pred, y.unsqueeze(1).type(torch.float), weight.to(torch.float32), resolution.to(torch.float32)).item()
         # Collect information for evaluation
-        x_array.extend(X.numpy())
-        y_array.extend(y.numpy())
+        x_array.extend(X.cpu().numpy())
+        y_array.extend(y.cpu().numpy())
         if (pred.squeeze().shape==torch.Size([])): pred_array.append(pred.squeeze().numpy())
-        else: pred_array.extend(pred.squeeze().numpy())
+        else: pred_array.extend(pred.squeeze().cpu().numpy())
         mass_array.extend(spec[:,0])
         w_lumi_array.extend(spec[:,1])
     # Post batch loop operations
@@ -495,19 +495,21 @@ def find_nearest(array,value):
 if __name__ == "__main__":
   ROOT.EnableImplicitMT()
   # 1: Use tmva training, 2: Use previous nn training
-  do_fine_tune = 1
+  do_fine_tune = 0
   model_filename = 'runs/May20_01-59-34_hepmacprojb.local/model_epoch_4990.pt'
-  batch_size = 128
+  #batch_size = 128
+  batch_size = 4096
 
   #batch_size = 1
   # train_loss = 0: cross-entropy, 1: s/sqrt(s+b), 2: Z, 3: purity
   # train_loss = 100: s/sqrt(s+b*res)
-  train_loss = 100
+  train_loss = 0
 
   writer = SummaryWriter()
   writer_foldername = writer.get_logdir()
 
-  device = "cpu"
+  #device = "cpu"
+  device = "cuda"
   print(f"Using {device} device")
   torch.manual_seed(1)
   model = SimpleNetwork(input_size=10, hidden_size=40, output_size=1).to(device)
@@ -606,8 +608,8 @@ if __name__ == "__main__":
   elif train_loss == 100: loss_fn = significance_res_loss()
 
 
-  epochs = 20 * batch_size # Keeps number of updates on model constant
-  epochs = 50
+  epochs = 100 * batch_size # Keeps number of updates on model constant
+  #epochs = 50
   #test(train_dataloader, model, loss_fn, train_loss!=0)
   for iEpoch in range(epochs):
     if iEpoch != 0:
@@ -615,7 +617,7 @@ if __name__ == "__main__":
       if train_loss == 0: train(train_dataloader, model, loss_fn, optimizer, use_weight_in_loss=False)
       elif train_loss < 100 : train(train_dataloader, model, loss_fn, optimizer, use_weight_in_loss=True)
       else: train(train_dataloader, model, loss_fn, optimizer, use_weight_in_loss=True, use_res_in_loss=True)
-    if iEpoch % 10 == 0:
+    if iEpoch % 100 == 0:
       # Evaluate
       results = {'train': {}, 'test': {}}
       filename = 'trash/evaluate.root'
