@@ -97,6 +97,10 @@ void parse_xml(string tmva_weights, vector<string> & tmva_variables, vector<stri
 // Run: root use_tmva.C -q
 using namespace TMVA;
 void use_tmva() {
+
+  // evaluate_mva = 1 is for bdt, evaluate_mva = 2 is for nn
+  int evaluate_mva = 1;
+
   // Load bdt tmva
   TMVA::Reader *tmva_reader = new TMVA::Reader( "!Color:!Silent" );
 
@@ -106,6 +110,19 @@ void use_tmva() {
   string input_test_tree = "test_tree";
   string label = "classID";
 
+  string output_root;
+  string tmva_weights;
+  string tmva_output;
+  if (evaluate_mva == 1) {
+    output_root = "tmva_evaluate_bdt.root";
+    tmva_weights = "dataset/weights/TMVAClassification_BDT.weights.xml";
+    tmva_output = "BDT";
+  } else {
+    output_root = "tmva_evaluate_nn.root";
+    tmva_weights = "dataset/weights/TMVAClassification_DNN.weights.xml";
+    tmva_output = "DNN";
+  }
+
   //// For BDT
   //string output_root = "tmva_evaluate_bdt.root";
   //string tmva_weights = "dataset/weights/TMVAClassification_BDT.weights.xml";
@@ -114,13 +131,13 @@ void use_tmva() {
   ////   "photon_res", "photon_rapidity", "l1_rapidity", "l2_rapidity"};
   ////vector<string> tmva_spectators = {"llg_mass", "w_lumi"};
 
-  // For DNN
-  string output_root = "tmva_evaluate_nn.root";
-  string tmva_weights = "dataset/weights/TMVAClassification_DNN.weights.xml";
-  string tmva_output = "DNN";
-  //vector<string> tmva_variables = {"photon_mva", "min_dR", "pt_mass", "cosTheta", "costheta",
-  //   "llg_mass_err", "photon_rapidity", "l1_rapidity", "l2_rapidity", "llg_flavor"};
-  //vector<string> tmva_spectators = {"llg_mass", "w_lumi"};
+  //// For DNN
+  //string output_root = "tmva_evaluate_nn.root";
+  //string tmva_weights = "dataset/weights/TMVAClassification_DNN.weights.xml";
+  //string tmva_output = "DNN";
+  ////vector<string> tmva_variables = {"photon_mva", "min_dR", "pt_mass", "cosTheta", "costheta",
+  ////   "llg_mass_err", "photon_rapidity", "l1_rapidity", "l2_rapidity", "llg_flavor"};
+  ////vector<string> tmva_spectators = {"llg_mass", "w_lumi"};
 
   // Parse xml file to get variables and spectators
   vector<string> tmva_variables;
