@@ -1,3 +1,12 @@
+0. Setup python environment.
+source ROOT_ENV
+python3 -m venv py-env
+source py-env/bin/activate
+pip3 install --upgrade pip
+pip3 install torch torchvision torchaudio
+pip3 install uproot numpy scikit-learn matplotlib
+pip3 install jupyterlab
+
 1. Run zgamma_preprocess.py
   Output: 
   - Flat ntuples for bkg
