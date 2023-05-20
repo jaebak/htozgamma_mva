@@ -1,0 +1,24 @@
+1. Run zgamma_preprocess.py
+  Output: 
+  - Flat ntuples for bkg
+  - Flat ntuples for signal
+
+2. Run split_ntuples.py: Makes ntuples for training and testing.
+   Since it is hard to control training/test sample size in TMVA, make samples in split_ntuples.
+  Input: 
+  - Flat ntuples for bkg
+  - Flat ntuples for signal
+  Output: 
+  - signal train sample
+  - bkg train sample
+  - signal + bkg test sample
+  - signal + bkg train sample
+
+3. Run train_tmva.py to train tmva. Use 2 events for test sample to be able to save 'train' sample.
+  Input: signal + bkg train sample
+  Output: tmva root file
+
+4. Run use_tmva.C to apply on testing sample
+  Input: 
+  - signal + bkg test sample
+  Output: root that has test_tree and train_tree
