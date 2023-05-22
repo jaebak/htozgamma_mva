@@ -1,11 +1,18 @@
 import ROOT
 
+def get_unique_name(name, itrial = 0):
+  if ROOT.gROOT.FindObject(name):
+    name = f'{name}_{itrial}'
+    get_unique_name(name, itrial+1)
+  else: return name
+
 def new_canvas(name = "", size = 500):
   canvases = ROOT.gROOT.GetListOfCanvases()
   iCanvas = canvases.GetEntries()
   if name == "":
     canvas_name = f"c_g_{iCanvas}"
   else: canvas_name = name
+  canvas_name = get_unique_name(name)
   return ROOT.TCanvas(canvas_name, canvas_name, size, size)
 
 def get_max_th1():
@@ -36,3 +43,13 @@ import re
 def slugify(string):
   return re.sub(r'[-\s]+', '-',re.sub(r'[^\w\s-]', '',
                   unicodedata.normalize('NFKD', string)).strip().lower())
+
+def plot_variables(filenames, treename, branches, out_folder):
+  chain = ROOT.TChain(treename)
+  chain.Add(filenames)
+  for branch in branches:
+    c1 = new_canvas()
+    chain.Draw(branch, '')
+    filenames_slug = slugify(filenames)
+    c1.SaveAs(f'{out_folder}/{branch}__{filenames_slug}.pdf')
+

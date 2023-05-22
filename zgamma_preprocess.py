@@ -3,6 +3,8 @@
 Function that generates n-tuples for MVA training
 '''
 import ROOT
+ROOT.gROOT.SetBatch(ROOT.kTRUE)
+import rootutils
 
 def write_ntuples(filenames, cuts, out_name, defines=[], tree_name='tree', branches=()):
   '''Generate ROOT n-tuple from existing n-tuple
@@ -127,9 +129,9 @@ if __name__=='__main__':
   #signal_files = '/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*GluGluHToZG*.root'
   #bkg_1_files = '/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*DYJetsToLL_M-50*madgraphMLM*.root'
   #bkg_2_files = '/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*ZGToLLG_01J_5f*.root'
-  signal_files = '/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*GluGluHToZG*.root'
+  signal_files = '/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*GluGluHToZG*M-125*.root'
   bkg_1_files = '/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*DYJetsToLL_M-50*madgraphMLM*.root'
-  bkg_2_files = '/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*ZGToLLG_01J_5f*.root'
+  bkg_2_files = '/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*ZGToLLG_01J_5f_TuneCP5*.root'
   write_ntuples([signal_files],
       cuts,
       'ntuples/train_decorr_sig.root',
@@ -142,3 +144,6 @@ if __name__=='__main__':
       defines,
       'tree',
       branches)
+
+  rootutils.plot_variables('ntuples/train_decorr_sig.root', 'tree', branches, out_folder = 'plots')
+  rootutils.plot_variables('ntuples/train_decorr_bak.root', 'tree', branches, out_folder = 'plots')

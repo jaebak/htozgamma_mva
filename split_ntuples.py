@@ -79,10 +79,10 @@ if __name__ == '__main__':
   # Create training and test sample. Randomize events between training and testing. Scales up weights.
   split_ntuple( in_filename = 'ntuples/train_decorr_sig.root', in_treename = 'tree', 
     cut = '1',
-    train_fraction = 0.2, weight_branch_index = 13, out_filename = 'signal_sample.root')
+    train_fraction = 0.1, weight_branch_index = 13, out_filename = 'signal_sample.root')
   split_ntuple( in_filename = 'ntuples/train_decorr_bak.root', in_treename = 'tree', 
     cut = '1',
-    train_fraction = 0.2, weight_branch_index = 13, out_filename = 'bkg_sample.root')
+    train_fraction = 0.1, weight_branch_index = 13, out_filename = 'bkg_sample.root')
 
   # Combine signal and bkg for train sample. Randomizes events between signal and bkg.
   combine_signal_bkg(bkg_filename = 'bkg_sample.root', bkg_treename = 'train_tree',
