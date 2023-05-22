@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import xgboost
 from torch.utils.tensorboard import SummaryWriter
 import evaluate
+import Disco
 
 def unnormalize(values, norm_weights):
   feature_array = copy.deepcopy(values)
@@ -125,6 +126,23 @@ def mse_loss(output, target):
   print('target: '+str(target))
   loss = torch.mean((output - target)**2)
   return loss
+
+class entropy_disco_loss(nn.Module):
+  def __init__(self, disco_factor = 100.):
+    super(entropy_disco_loss, self).__init__()
+    self.bce_loss = nn.BCELoss()
+    self.disco_factor = disco_factor
+
+  def forward(self, output, target, mass):
+    # output/target/mass = [[single-value], [single-value], ...]
+    output_list = output.squeeze()
+    mass_list = mass.squeeze()
+    normedweight = torch.tensor([1.]*len(mass)).to(device)
+    disco = Disco.distance_corr(mass_list, output_list, normedweight)
+    bce = self.bce_loss(output, target)
+    loss = bce + self.disco_factor * disco
+    #print(bce, disco, loss)
+    return loss
 
 class significance_loss(nn.Module):
   def __init__(self, eps = 1e-7):
@@ -300,7 +318,7 @@ class SimpleNetwork(nn.Module):
         layer2_out = self.sigmoid(layer2)
         return layer2_out
 
-def train(dataloader, model, loss_fn, optimizer, use_weight_in_loss = False, use_res_in_loss = False):
+def train(dataloader, model, loss_fn, optimizer, use_weight_in_loss = False, use_res_in_loss = False, use_mass_in_loss = False):
     size = len(dataloader.dataset)
     model.train()
     avg_loss = 0.
@@ -323,18 +341,20 @@ def train(dataloader, model, loss_fn, optimizer, use_weight_in_loss = False, use
         #print(f'y: {y}, size: {y.size()}')
         #print('pred squeeze: ',pred.squeeze())
         #loss = loss_fn(pred, y)
-        if use_weight_in_loss == False: 
-          loss = loss_fn(pred.to(torch.float32), y.unsqueeze(1).to(torch.float32))
-        else:
-          weight = spec[:,1].to(device).unsqueeze(1).type(torch.float32)
-          if use_res_in_loss == False:
-            loss = loss_fn(pred, y.unsqueeze(1).type(torch.float), weight.to(torch.float32))
-          else:
-            resolution = (X[:,5]+1)*(normalize_max_min[5][1]-normalize_max_min[5][0])/2+normalize_max_min[5][0]
-            loss = loss_fn(pred, y.unsqueeze(1).type(torch.float), weight.to(torch.float32), resolution.to(torch.float32))
-        #pred_binary = pred.squeeze().to(torch.float32)
-        #y_binary = y.to(torch.float32)
-        #loss = loss_fn(pred_binary, y_binary)
+
+        loss = calculate_loss(X, y, pred, spec, loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
+        #if use_weight_in_loss == False: 
+        #  loss = loss_fn(pred.to(torch.float32), y.unsqueeze(1).to(torch.float32))
+        #else:
+        #  weight = spec[:,1].to(device).unsqueeze(1).type(torch.float32)
+        #  if use_res_in_loss == False:
+        #    loss = loss_fn(pred, y.unsqueeze(1).type(torch.float), weight.to(torch.float32))
+        #  else:
+        #    resolution = (X[:,5]+1)*(normalize_max_min[5][1]-normalize_max_min[5][0])/2+normalize_max_min[5][0]
+        #    loss = loss_fn(pred, y.unsqueeze(1).type(torch.float), weight.to(torch.float32), resolution.to(torch.float32))
+        ##pred_binary = pred.squeeze().to(torch.float32)
+        ##y_binary = y.to(torch.float32)
+        ##loss = loss_fn(pred_binary, y_binary)
 
         # Backpropagation
         optimizer.zero_grad()
@@ -403,7 +423,38 @@ def test(dataloader, model, loss_fn, use_weight_in_loss = None):
     #print(nCorrect, nTotal, correct)
     #print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
-def evaluate_sample(dataloader, device, model, loss_fn, use_weight_in_loss = False, use_res_in_loss = False):
+def calculate_loss(X, y, pred, spec, loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss):
+  if use_weight_in_loss == False and use_res_in_loss == False and use_mass_in_loss == False:
+    loss = loss_fn(pred.to(torch.float32), y.unsqueeze(1).to(torch.float32))
+  elif use_weight_in_loss == False and use_res_in_loss == False and use_mass_in_loss == True:
+    mass = spec[:,0].to(device).unsqueeze(1).type(torch.float32)
+    loss = loss_fn(pred.to(torch.float32), y.unsqueeze(1).to(torch.float32), mass)
+  elif use_weight_in_loss == False and use_res_in_loss == True and use_mass_in_loss == False:
+    resolution = (X[:,5]+1)*(normalize_max_min[5][1]-normalize_max_min[5][0])/2+normalize_max_min[5][0]
+    loss = loss_fn(pred, y.unsqueeze(1).type(torch.float), resolution.to(torch.float32))
+  elif use_weight_in_loss == False and use_res_in_loss == True and use_mass_in_loss == True:
+    mass = spec[:,0].to(device).unsqueeze(1).type(torch.float32)
+    resolution = (X[:,5]+1)*(normalize_max_min[5][1]-normalize_max_min[5][0])/2+normalize_max_min[5][0]
+    loss = loss_fn(pred.to(torch.float32), y.unsqueeze(1).to(torch.float32), resolution.to(torch.float32), mass.to(torch.float32))
+  elif use_weight_in_loss == True and use_res_in_loss == False and use_mass_in_loss == False:
+    weight = spec[:,1].to(device).unsqueeze(1).type(torch.float32)
+    loss = loss_fn(pred, y.unsqueeze(1).type(torch.float), weight.to(torch.float32))
+  elif use_weight_in_loss == True and use_res_in_loss == False and use_mass_in_loss == True:
+    weight = spec[:,1].to(device).unsqueeze(1).type(torch.float32)
+    mass = spec[:,0].to(device).unsqueeze(1).type(torch.float32)
+    loss = loss_fn(pred.to(torch.float32), y.unsqueeze(1).to(torch.float32), weight.to(torch.float32), mass.to(torch.float32))
+  elif use_weight_in_loss == True and use_res_in_loss == True and use_mass_in_loss == False:
+    weight = spec[:,1].to(device).unsqueeze(1).type(torch.float32)
+    resolution = (X[:,5]+1)*(normalize_max_min[5][1]-normalize_max_min[5][0])/2+normalize_max_min[5][0]
+    loss = loss_fn(pred, y.unsqueeze(1).type(torch.float), weight.to(torch.float32), resolution.to(torch.float32))
+  elif use_weight_in_loss == True and use_res_in_loss == True and use_mass_in_loss == True:
+    weight = spec[:,1].to(device).unsqueeze(1).type(torch.float32)
+    resolution = (X[:,5]+1)*(normalize_max_min[5][1]-normalize_max_min[5][0])/2+normalize_max_min[5][0]
+    mass = spec[:,0].to(device).unsqueeze(1).type(torch.float32)
+    loss = loss_fn(pred, y.unsqueeze(1).type(torch.float), weight.to(torch.float32), resolution.to(torch.float32), mass.to(torch.float32))
+  return loss
+
+def evaluate_sample(dataloader, device, model, loss_fn, use_weight_in_loss = False, use_res_in_loss = False, use_mass_in_loss=False):
     nBatches = len(dataloader)
     model.eval()
     loss = 0.
@@ -414,15 +465,16 @@ def evaluate_sample(dataloader, device, model, loss_fn, use_weight_in_loss = Fal
       for feature, label, spec in dataloader:
         X, y = feature.to(device), torch.max(label,1)[1].to(device)
         pred = model(X)
-        if use_weight_in_loss == False: 
-          loss += loss_fn(pred, y.unsqueeze(1).type(torch.float)).item()
-        else: 
-          weight = spec[:,1].to(device).unsqueeze(1).type(torch.float)
-          if use_res_in_loss == False:
-            loss += loss_fn(pred, y.unsqueeze(1).type(torch.float), weight.to(torch.float32)).item()
-          else:
-            resolution = (X[:,5]+1)*(normalize_max_min[5][1]-normalize_max_min[5][0])/2+normalize_max_min[5][0]
-            loss += loss_fn(pred, y.unsqueeze(1).type(torch.float), weight.to(torch.float32), resolution.to(torch.float32)).item()
+        loss += calculate_loss(X, y, pred, spec, loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss).item()
+        #if use_weight_in_loss == False: 
+        #  loss += loss_fn(pred, y.unsqueeze(1).type(torch.float)).item()
+        #else: 
+        #  weight = spec[:,1].to(device).unsqueeze(1).type(torch.float)
+        #  if use_res_in_loss == False:
+        #    loss += loss_fn(pred, y.unsqueeze(1).type(torch.float), weight.to(torch.float32)).item()
+        #  else:
+        #    resolution = (X[:,5]+1)*(normalize_max_min[5][1]-normalize_max_min[5][0])/2+normalize_max_min[5][0]
+        #    loss += loss_fn(pred, y.unsqueeze(1).type(torch.float), weight.to(torch.float32), resolution.to(torch.float32)).item()
         # Collect information for evaluation
         x_array.extend(X.cpu().numpy())
         y_array.extend(y.cpu().numpy())
@@ -500,13 +552,48 @@ if __name__ == "__main__":
   #batch_size = 128
   batch_size = 4096
 
-  #batch_size = 1
-  # train_loss = 0: cross-entropy, 1: s/sqrt(s+b), 2: Z, 3: purity
-  # train_loss = 100: s/sqrt(s+b*res)
-  train_loss = 0
+  do_test = False
 
-  writer = SummaryWriter()
-  writer_foldername = writer.get_logdir()
+  #batch_size = 1
+  # train_loss
+  # 0: cross-entropy, 
+  # 1: s/sqrt(s+b), 2: Z, 3: purity
+  # 100: s/sqrt(s+b*res)
+  # 200: cross-entropy + disco
+  train_loss = 200
+
+  use_weight_in_loss = False
+  use_res_in_loss = False
+  use_mass_in_loss = False
+  if train_loss == 0: 
+    loss_fn = nn.BCELoss()
+    loss_filename = ''
+  elif train_loss == 1: 
+    loss_fn = significance_loss()
+    use_weight_in_loss = True
+    loss_filename = '_signi_loss'
+  elif train_loss == 2: 
+    loss_fn = z_loss()
+    use_weight_in_loss = True
+    loss_filename = '_z_loss'
+  elif train_loss == 3: 
+    loss_fn = purity_loss()
+    use_weight_in_loss = True
+    loss_filename = '_purity_loss'
+  elif train_loss == 100: 
+    loss_fn = significance_res_loss()
+    use_weight_in_loss = True
+    use_res_in_loss = True
+    loss_filename = '_signi_res_loss'
+  elif train_loss == 200: 
+    loss_fn = entropy_disco_loss()
+    use_mass_in_loss = True
+    loss_filename = '_entropy_disco'
+
+
+  if do_test == False:
+    writer = SummaryWriter()
+    writer_foldername = writer.get_logdir()
 
   #device = "cpu"
   device = "cuda"
@@ -574,7 +661,8 @@ if __name__ == "__main__":
                             cut = '1',
                             spectators = ['llg_mass', 'w_lumi'],
                             class_branch = ['classID'], 
-                            entry_stop = len(train_dataset))
+                            entry_stop = len(train_dataset)
+                            )
   print(f'test entries: {len(test_dataset)}')
 
   #eval_dataset = RootDataset(root_filename='ntuples_mva/TMVA_nn.root',
@@ -601,29 +689,22 @@ if __name__ == "__main__":
   else:
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-  if train_loss == 0: loss_fn = nn.BCELoss()
-  elif train_loss == 1: loss_fn = significance_loss()
-  elif train_loss == 2: loss_fn = z_loss()
-  elif train_loss == 3: loss_fn = purity_loss()
-  elif train_loss == 100: loss_fn = significance_res_loss()
 
-
-  epochs = 100 * batch_size # Keeps number of updates on model constant
+  epochs = 20 * batch_size # Keeps number of updates on model constant
   #epochs = 50
   #test(train_dataloader, model, loss_fn, train_loss!=0)
+  if do_test: epochs = 1
   for iEpoch in range(epochs):
     if iEpoch != 0:
       print(f"Epoch {iEpoch+1}\n-------------------------------")
-      if train_loss == 0: train(train_dataloader, model, loss_fn, optimizer, use_weight_in_loss=False)
-      elif train_loss < 100 : train(train_dataloader, model, loss_fn, optimizer, use_weight_in_loss=True)
-      else: train(train_dataloader, model, loss_fn, optimizer, use_weight_in_loss=True, use_res_in_loss=True)
+      train(train_dataloader, model, loss_fn, optimizer, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
     if iEpoch % 100 == 0:
       # Evaluate
       results = {'train': {}, 'test': {}}
       filename = 'trash/evaluate.root'
       # Returns loss, sample arrays
-      results['train'] = evaluate_sample(train_dataloader, device, model, loss_fn, train_loss!=0, train_loss>=100)
-      results['test'] = evaluate_sample(test_dataloader, device, model, loss_fn, train_loss!=0, train_loss>=100)
+      results['train'] = evaluate_sample(train_dataloader, device, model, loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
+      results['test'] = evaluate_sample(test_dataloader, device, model, loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
       # Create evaluation root file
       with uproot.recreate(filename) as root_file:
         root_file['train_tree'] = {'x': results['train']['x'], 'y': results['train']['y'], 'yhat': results['train']['yhat'], 'mass': results['train']['mass'], 'weight': results['train']['weight']}
@@ -656,15 +737,17 @@ if __name__ == "__main__":
       print(f"significance with res.: train: {results['train']['significance_res']:.6f}, test: {results['test']['significance_res']:.6f}")
       print(f"purity with res.: train: {results['train']['purity_res']:.6f}, test: {results['test']['purity_res']:.6f}")
       print(f"observable std div: train: {results['train']['observable_std_div']:.6f}, test: {results['test']['observable_std_div']:.6f}")
-      writer.add_scalars('Loss', {'train': results['train']['loss'], 'test': results['test']['loss']}, iEpoch)
-      writer.add_scalars('Significance', {'train': results['train']['significance'], 'test': results['test']['significance']}, iEpoch)
-      writer.add_scalars('Purity', {'train': results['train']['purity'], 'test': results['test']['purity']}, iEpoch)
-      writer.add_scalars('Significance with res.', {'train': results['train']['significance_res'], 'test': results['test']['significance_res']}, iEpoch)
-      writer.add_scalars('Purity with res.', {'train': results['train']['purity_res'], 'test': results['test']['purity_res']}, iEpoch)
-      writer.add_scalars('Observable std. div.', {'train': results['train']['observable_std_div'], 'test': results['test']['observable_std_div']}, iEpoch)
+      if do_test == False:
+        writer.add_scalars('Loss', {'train': results['train']['loss'], 'test': results['test']['loss']}, iEpoch)
+        writer.add_scalars('Significance', {'train': results['train']['significance'], 'test': results['test']['significance']}, iEpoch)
+        writer.add_scalars('Purity', {'train': results['train']['purity'], 'test': results['test']['purity']}, iEpoch)
+        writer.add_scalars('Significance with res.', {'train': results['train']['significance_res'], 'test': results['test']['significance_res']}, iEpoch)
+        writer.add_scalars('Purity with res.', {'train': results['train']['purity_res'], 'test': results['test']['purity_res']}, iEpoch)
+        writer.add_scalars('Observable std. div.', {'train': results['train']['observable_std_div'], 'test': results['test']['observable_std_div']}, iEpoch)
       # Save model
-      model_filename = writer_foldername+f'/model_epoch_{iEpoch}.pt'
-      torch.save(model.state_dict(), model_filename)
+      if do_test == False:
+        model_filename = writer_foldername+f'/model_epoch_{iEpoch}.pt'
+        torch.save(model.state_dict(), model_filename)
 
   # Save train 
   train_feature_array = train_dataset.feature_array
@@ -716,23 +799,21 @@ if __name__ == "__main__":
 
 
 
-  filename = 'ntuples_mva/'
-  if do_fine_tune == 1: filename += 'fine_nn'
-  elif do_fine_tune == 2: filename += 'torch_fine_nn' 
-  else: filename += 'torch_nn'
-  if train_loss == 1: filename += '_loss1'
-  elif train_loss == 2: filename += '_loss2'
-  elif train_loss == 3: filename += '_loss3'
-  elif train_loss == 100: filename += '_loss100'
-  if batch_size != 1: filename +='_batch'+str(batch_size)
-  filename += '.root'
-  root_file = uproot.recreate(filename)
-  root_file["test_tree"] = {'x_norm': test_feature_array, 'x': test_unnorm_feature_array, 'y': test_label_array, 'yhat': test_predict_array_nn, 'mass': test_mass_array, 'weight': test_weight_array}
-  root_file["train_tree"] = {'x_norm': train_feature_array, 'x': train_unnorm_feature_array, 'y': train_label_array, 'yhat': train_predict_array_nn, 'mass': train_mass_array, 'weight': train_weight_array}
-  root_file["test_full_tree"] = {'x_norm': eval_feature_array, 'x': eval_unnorm_feature_array, 'y': eval_label_array, 'yhat': eval_predict_array_nn, 'mass': eval_mass_array, 'weight': eval_weight_array}
-  print('Results saved to '+filename)
 
-  writer.close()
+  if do_test == False: 
+    filename = 'ntuples_mva/'
+    if do_fine_tune == 1: filename += 'fine_nn'
+    elif do_fine_tune == 2: filename += 'torch_fine_nn' 
+    else: filename += 'torch_nn'
+    filename += loss_filename
+    if batch_size != 1: filename +='_batch'+str(batch_size)
+    filename += '.root'
+    root_file = uproot.recreate(filename)
+    root_file["test_tree"] = {'x_norm': test_feature_array, 'x': test_unnorm_feature_array, 'y': test_label_array, 'yhat': test_predict_array_nn, 'mass': test_mass_array, 'weight': test_weight_array}
+    root_file["train_tree"] = {'x_norm': train_feature_array, 'x': train_unnorm_feature_array, 'y': train_label_array, 'yhat': train_predict_array_nn, 'mass': train_mass_array, 'weight': train_weight_array}
+    root_file["test_full_tree"] = {'x_norm': eval_feature_array, 'x': eval_unnorm_feature_array, 'y': eval_label_array, 'yhat': eval_predict_array_nn, 'mass': eval_mass_array, 'weight': eval_weight_array}
+    print('Results saved to '+filename)
+    writer.close()
 
   #for iEvent, feats in enumerate(test_feature_array):
   #  print('feat: '+','.join(str(x) for x in raw_test_feature_array[iEvent]))
