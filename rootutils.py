@@ -53,3 +53,6 @@ def plot_variables(filenames, treename, branches, out_folder):
     filenames_slug = slugify(filenames)
     c1.SaveAs(f'{out_folder}/{branch}__{filenames_slug}.pdf')
 
+def normalize_hist(hist):
+  sum_weight = hist.GetSumOfWeights()
+  hist.Scale(1./sum_weight)
