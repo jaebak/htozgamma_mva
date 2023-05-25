@@ -71,6 +71,28 @@ def combine_signal_bkg(bkg_filename, bkg_treename,
   signal_file.close()
 
 if __name__ == '__main__':
+  input_signal_filename = 'ntuples/train_decorr_sig_shapewgt_run2.root'
+  input_bkg_filename = 'ntuples/train_decorr_bak_shapewgt_run2.root'
+
+  #split_signal_filename = 'signal_sample_run2.root'
+  #split_bkg_filename = 'bkg_sample_run2.root'
+  #train_sample_filename = 'train_sample_run2.root'
+  #test_sample_filename = 'test_sample_run2.root'
+  #test_full_sample_filename = 'test_full_sample_run2.root'
+
+  #split_signal_filename = 'signal_sample_run2_0p05.root'
+  #split_bkg_filename = 'bkg_sample_run2_0p05.root'
+  #train_sample_filename = 'train_sample_run2_0p05.root'
+  #test_sample_filename = 'test_sample_run2_0p05.root'
+  #test_full_sample_filename = 'test_full_sample_run2_0p05.root'
+
+  split_signal_filename = 'signal_sample_run2_win10.root'
+  split_bkg_filename = 'bkg_sample_run2_win10.root'
+  train_sample_filename = 'train_sample_run2_win10.root'
+  test_sample_filename = 'test_sample_run2_win10.root'
+  test_full_sample_filename = 'test_full_sample_run2_win10.root'
+
+
   # List of branches from zgamma_preprocess.py
   branches = ['photon_mva','min_dR','max_dR','pt_mass','cosTheta',
               'costheta', 'phi','photon_res','photon_rapidity','l1_rapidity',
@@ -80,28 +102,30 @@ if __name__ == '__main__':
   np.random.seed(1)
   # Create training and test sample. Randomize events between training and testing. Scales up weights.
   # weight index starts from 0
-  split_ntuple( in_filename = 'ntuples/train_decorr_sig_shapewgt.root', in_treename = 'tree', branches = branches,
+  split_ntuple( in_filename = input_signal_filename, in_treename = 'tree', branches = branches,
     cut = '1',
-    train_fraction = 0.1, weight_branch_index = 19, out_filename = 'signal_sample.root')
-  split_ntuple( in_filename = 'ntuples/train_decorr_bak_shapewgt.root', in_treename = 'tree', branches = branches,
+    train_fraction = 0.05, weight_branch_index = 19, out_filename = split_signal_filename)
+  split_ntuple( in_filename = input_bkg_filename, in_treename = 'tree', branches = branches,
     cut = '1',
-    train_fraction = 0.1, weight_branch_index = 19, out_filename = 'bkg_sample.root')
+    train_fraction = 0.05, weight_branch_index = 19, out_filename = split_bkg_filename)
 
   # Combine signal and bkg for train sample. Randomizes events between signal and bkg.
-  combine_signal_bkg(bkg_filename = 'bkg_sample.root', bkg_treename = 'train_tree',
-    signal_filename = 'signal_sample.root', signal_treename = 'train_tree',
+  combine_signal_bkg(bkg_filename = split_bkg_filename, bkg_treename = 'train_tree',
+    signal_filename = split_signal_filename, signal_treename = 'train_tree',
     cut = '(llg_mass>120) & (llg_mass<130)',
-    out_filename = 'train_sample.root', out_treename = 'train_tree')
+    #cut = '(llg_mass>110) & (llg_mass<140)',
+    out_filename = train_sample_filename, out_treename = 'train_tree')
 
   # Combine signal and bkg for test sample. Randomizes events between signal and bkg. # Note: When trying to update root file, it created issues.
-  combine_signal_bkg(bkg_filename = 'bkg_sample.root', bkg_treename = 'test_tree',
-    signal_filename = 'signal_sample.root', signal_treename = 'test_tree',
+  combine_signal_bkg(bkg_filename = split_bkg_filename, bkg_treename = 'test_tree',
+    signal_filename = split_signal_filename, signal_treename = 'test_tree',
     cut = '(llg_mass>120) & (llg_mass<130)',
-    out_filename = 'test_sample.root', out_treename = 'test_tree')
+    #cut = '(llg_mass>110) & (llg_mass<140)',
+    out_filename = test_sample_filename, out_treename = 'test_tree')
 
   # Combine signal and bkg for test sample. Randomizes events between signal and bkg.
   # Note: When trying to update root file, it created issues.
-  combine_signal_bkg(bkg_filename = 'bkg_sample.root', bkg_treename = 'test_tree',
-    signal_filename = 'signal_sample.root', signal_treename = 'test_tree',
+  combine_signal_bkg(bkg_filename = split_bkg_filename, bkg_treename = 'test_tree',
+    signal_filename = split_signal_filename, signal_treename = 'test_tree',
     cut = '1',
-    out_filename = 'test_full_sample.root', out_treename = 'test_tree')
+    out_filename = test_full_sample_filename, out_treename = 'test_tree')

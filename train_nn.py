@@ -128,7 +128,7 @@ def mse_loss(output, target):
   return loss
 
 class entropy_disco_loss(nn.Module):
-  def __init__(self, disco_factor = 100.):
+  def __init__(self, disco_factor = 5.):
     super(entropy_disco_loss, self).__init__()
     self.bce_loss = nn.BCELoss()
     self.disco_factor = disco_factor
@@ -138,10 +138,100 @@ class entropy_disco_loss(nn.Module):
     output_list = output.squeeze()
     mass_list = mass.squeeze()
     normedweight = torch.tensor([1.]*len(mass)).to(device)
+    # TODO: Should ignore signal mass correlation
+    # mask = (target.squeeze() == 0)
+    # mass_list = mass_list[mask]
+    # output_list = output_list[mask]
+    # normedweight = normedweight[mask]
     disco = Disco.distance_corr(mass_list, output_list, normedweight)
     bce = self.bce_loss(output, target)
     loss = bce + self.disco_factor * disco
-    #print(bce, disco, loss)
+    #print(f'bce: {bce}, disco: {disco}, loss: {loss}')
+    return loss
+
+class entropy_bkg_disco_loss(nn.Module):
+  def __init__(self, disco_factor = 5.):
+    super(entropy_bkg_disco_loss, self).__init__()
+    self.bce_loss = nn.BCELoss()
+    self.disco_factor = disco_factor
+
+  def forward(self, output, target, mass):
+    # output/target/mass = [[single-value], [single-value], ...]
+    output_list = output.squeeze()
+    mass_list = mass.squeeze()
+    normedweight = torch.tensor([1.]*len(mass)).to(device)
+    # Ignore signal mass correlation
+    mask = (target.squeeze() == 0)
+    mass_list = mass_list[mask]
+    output_list = output_list[mask]
+    normedweight = normedweight[mask]
+    #print(target.squeeze()[mask], mass_list)
+    disco = Disco.distance_corr(mass_list, output_list, normedweight)
+    bce = self.bce_loss(output, target)
+    loss = bce + self.disco_factor * disco
+    #print(f'bce: {bce}, disco: {disco}, loss: {loss}')
+    return loss
+
+class entropy_bkg_disco_signi_res_loss(nn.Module):
+  def __init__(self, disco_factor = 5.):
+    super(entropy_bkg_disco_signi_res_loss, self).__init__()
+    self.bce_loss = nn.BCELoss()
+    self.disco_factor = disco_factor
+
+  def forward(self, output, target, weight, resolution, mass):
+    # output/target/mass = [[single-value], [single-value], ...]
+    output_list = output.squeeze()
+    mass_list = mass.squeeze()
+    normedweight = torch.tensor([1.]*len(mass)).to(device)
+    # Ignore signal mass correlation
+    mask = (target.squeeze() == 0)
+    mass_list = mass_list[mask]
+    output_list = output_list[mask]
+    normedweight = normedweight[mask]
+    #print(target.squeeze()[mask], mass_list)
+    disco = Disco.distance_corr(mass_list, output_list, normedweight)
+    bce = self.bce_loss(output, target)
+    signal = torch.sum(output * target * weight)
+    #print(f'resolution: {resolution}, output: {output.squeeze()}, target: {target.squeeze()}')
+    avg_signal_res = torch.sum(output.squeeze() * target.squeeze() * resolution) / torch.sum(output.squeeze() * target.squeeze())
+    bkg = torch.sum(output * (1-target) * weight)
+    bkg_with_res = bkg * 2. * avg_signal_res
+    signi_res = -torch.log(signal/torch.sqrt(signal+bkg_with_res))
+    #print(f'signal: {signal} bkg: {bkg} avg_signal_res: {avg_signal_res} bkg_with_res: {bkg_with_res} signi_res: {signi_res}')
+    #print(f'sum_res: {torch.sum(output * target * resolution)}, sum: {torch.sum(output * target)}')
+    loss = bce + self.disco_factor * disco + signi_res / 30
+    #print(f'bce: {bce}, disco: {disco}, signi_res: {signi_res}, loss: {loss}')
+    return loss
+
+class entropy_bkg_disco_signi_res2_loss(nn.Module):
+  def __init__(self, disco_factor = 5.):
+    super(entropy_bkg_disco_signi_res2_loss, self).__init__()
+    self.bce_loss = nn.BCELoss()
+    self.disco_factor = disco_factor
+
+  def forward(self, output, target, weight, resolution, mass):
+    # output/target/mass = [[single-value], [single-value], ...]
+    output_list = output.squeeze()
+    mass_list = mass.squeeze()
+    normedweight = torch.tensor([1.]*len(mass)).to(device)
+    # Ignore signal mass correlation
+    mask = (target.squeeze() == 0)
+    mass_list = mass_list[mask]
+    output_list = output_list[mask]
+    normedweight = normedweight[mask]
+    #print(target.squeeze()[mask], mass_list)
+    disco = Disco.distance_corr(mass_list, output_list, normedweight)
+    bce = self.bce_loss(output, target)
+    signal = torch.sum(output * target * weight)
+    #print(f'resolution: {resolution}, output: {output.squeeze()}, target: {target.squeeze()}')
+    avg_signal_res = torch.sum(output.squeeze() * target.squeeze() * resolution) / torch.sum(output.squeeze() * target.squeeze())
+    bkg = torch.sum(output * (1-target) * weight)
+    bkg_with_res = bkg * 2. * avg_signal_res
+    signi_res = torch.sqrt(signal+bkg_with_res)/signal
+    #print(f'signal: {signal} bkg: {bkg} avg_signal_res: {avg_signal_res} bkg_with_res: {bkg_with_res} signi_res: {signi_res}')
+    #print(f'sum_res: {torch.sum(output * target * resolution)}, sum: {torch.sum(output * target)}')
+    loss = bce + self.disco_factor * disco + signi_res / 1000
+    #print(f'bce: {bce}, disco: {disco}, signi_res: {signi_res}, loss: {loss}')
     return loss
 
 class significance_loss(nn.Module):
@@ -550,7 +640,28 @@ if __name__ == "__main__":
   do_fine_tune = 0
   model_filename = 'runs/May20_01-59-34_hepmacprojb.local/model_epoch_4990.pt'
   #batch_size = 128
-  batch_size = 4096
+  #batch_size = 4096
+  batch_size = 8192
+  #batch_size = 16384 # crashes with memory issue
+
+  epochs = 10 * batch_size # Keeps number of updates on model constant
+  eval_epoch = 100
+
+  #epochs = 100
+  #eval_epoch = 10
+
+  #device = "cpu"
+  device = "cuda"
+
+  train_filename = 'train_sample_run2.root'
+  test_filename = 'test_sample_run2.root'
+  test_full_filename = 'test_full_sample_run2.root'
+  log_dir = None
+  output_name = 'torch_nn'
+
+  #train_filename = 'train_sample_run2_0p05.root'
+  #test_filename = 'test_sample_run2_0p05.root'
+  #test_full_filename = 'test_full_sample_run2_0p05.root'
 
   do_test = False
 
@@ -560,7 +671,12 @@ if __name__ == "__main__":
   # 1: s/sqrt(s+b), 2: Z, 3: purity
   # 100: s/sqrt(s+b*res)
   # 200: cross-entropy + disco
-  train_loss = 200
+  # 201: cross-entropy + disco (only on bkg)
+  # 202: cross-entropy + disco (only on bkg) + -ln(s/sqrt(s+b*res))
+  # 203: cross-entropy + disco (only on bkg) + sqrt(s+b*res)/s
+  train_loss = 203
+  #log_dir = f'runs/loss{train_loss}'
+  #output_name = f'nn_{log_dir}'.replace('/','_')
 
   use_weight_in_loss = False
   use_res_in_loss = False
@@ -589,14 +705,28 @@ if __name__ == "__main__":
     loss_fn = entropy_disco_loss()
     use_mass_in_loss = True
     loss_filename = '_entropy_disco'
+  elif train_loss == 201: 
+    loss_fn = entropy_bkg_disco_loss()
+    use_mass_in_loss = True
+    loss_filename = '_entropy_bkg_disco'
+  elif train_loss == 202: 
+    loss_fn = entropy_bkg_disco_signi_res_loss()
+    use_mass_in_loss = True
+    use_res_in_loss = True
+    use_weight_in_loss = True
+    loss_filename = '_entropy_bkg_disco_signi_res_loss'
+  elif train_loss == 203: 
+    loss_fn = entropy_bkg_disco_signi_res2_loss()
+    use_mass_in_loss = True
+    use_res_in_loss = True
+    use_weight_in_loss = True
+    loss_filename = '_entropy_bkg_disco_signi_res2_loss'
 
 
   if do_test == False:
-    writer = SummaryWriter()
+    writer = SummaryWriter(log_dir=log_dir)
     writer_foldername = writer.get_logdir()
 
-  #device = "cpu"
-  device = "cuda"
   print(f"Using {device} device")
   torch.manual_seed(1)
   model = SimpleNetwork(input_size=10, hidden_size=40, output_size=1).to(device)
@@ -637,7 +767,7 @@ if __name__ == "__main__":
   #                          cut = '1',
   #                          spectators = ['llg_mass', 'w_lumi'],
   #                          class_branch = ['classID'])
-  train_dataset = RootDataset(root_filename='train_sample.root',
+  train_dataset = RootDataset(root_filename= train_filename,
                             tree_name = "train_tree",
                             features = feature_names,
                             normalize = normalize_max_min,
@@ -654,7 +784,7 @@ if __name__ == "__main__":
   #                          spectators = ['llg_mass', 'w_lumi'],
   #                          class_branch = ['classID'], 
   #                          entry_stop = len(train_dataset))
-  test_dataset = RootDataset(root_filename='test_sample.root',
+  test_dataset = RootDataset(root_filename= test_filename,
                             tree_name = "test_tree",
                             features = feature_names,
                             normalize = normalize_max_min,
@@ -672,7 +802,7 @@ if __name__ == "__main__":
   #                          cut = '1',
   #                          spectators = ['llg_mass', 'w_lumi'],
   #                          class_branch = ['classID'])
-  eval_dataset = RootDataset(root_filename='test_full_sample.root',
+  eval_dataset = RootDataset(root_filename=test_full_filename,
                             tree_name = "test_tree",
                             features = feature_names,
                             normalize = normalize_max_min,
@@ -690,15 +820,14 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 
-  epochs = 20 * batch_size # Keeps number of updates on model constant
   #epochs = 50
   #test(train_dataloader, model, loss_fn, train_loss!=0)
   if do_test: epochs = 1
   for iEpoch in range(epochs):
-    if iEpoch != 0:
+    if iEpoch != 0 or do_test:
       print(f"Epoch {iEpoch+1}\n-------------------------------")
       train(train_dataloader, model, loss_fn, optimizer, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
-    if iEpoch % 100 == 0:
+    if iEpoch % eval_epoch == 0:
       # Evaluate
       results = {'train': {}, 'test': {}}
       filename = 'trash/evaluate.root'
@@ -801,12 +930,12 @@ if __name__ == "__main__":
 
 
   if do_test == False: 
-    filename = 'ntuples_mva/'
-    if do_fine_tune == 1: filename += 'fine_nn'
-    elif do_fine_tune == 2: filename += 'torch_fine_nn' 
-    else: filename += 'torch_nn'
-    filename += loss_filename
-    if batch_size != 1: filename +='_batch'+str(batch_size)
+    filename = 'ntuples_mva/'+output_name
+    #if do_fine_tune == 1: filename += 'fine_nn'
+    #elif do_fine_tune == 2: filename += 'torch_fine_nn' 
+    #else: filename += 'torch_nn'
+    #filename += loss_filename
+    #if batch_size != 1: filename +='_batch'+str(batch_size)
     filename += '.root'
     root_file = uproot.recreate(filename)
     root_file["test_tree"] = {'x_norm': test_feature_array, 'x': test_unnorm_feature_array, 'y': test_label_array, 'yhat': test_predict_array_nn, 'mass': test_mass_array, 'weight': test_weight_array}

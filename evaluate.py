@@ -484,7 +484,7 @@ def evaluate_significance_with_resolution(info_mvas, draw=True, tree_type='test_
       if significances[mva_threshold] > best_significance:
         best_significance = significances[mva_threshold]
         best_mva = mva_threshold
-    #print(f'Best mva threshold: {best_mva:.4f} significance: {best_significance:.4f}')
+    print(f'{mva_tag} Best mva threshold: {best_mva:.4f} significance: {best_significance:.4f}')
     best_significances.append(best_significance)
     purity_sigeff70s.append(purity_sigeff70)
     # Make graph
@@ -516,10 +516,12 @@ def evaluate_significance_with_resolution(info_mvas, draw=True, tree_type='test_
   # Draw graphs
   if draw:
     c1 = rootutils.new_canvas()
+    c1.SetLeftMargin(0.15)
     significance_legend = ROOT.TLegend(0.7, 0.9, 0.9, 0.98)
-    colors = [1,2,3,4,5,6]
+    colors = [1,2,3,4,6,7,8]
     for iMva, mva_tag in enumerate(significance_graphs):
-      significance_graphs[mva_tag].SetTitle(mva_tag)
+      #significance_graphs[mva_tag].SetTitle(mva_tag)
+      significance_graphs[mva_tag].SetTitle(f'{mva_tag};signal eff.;significance')
       if iMva == 0: significance_graphs[mva_tag].Draw("APL")
       else: significance_graphs[mva_tag].Draw("PL")
       significance_graphs[mva_tag].SetLineColor(colors[iMva])
@@ -532,10 +534,11 @@ def evaluate_significance_with_resolution(info_mvas, draw=True, tree_type='test_
     c1.SaveAs('plots/significances_with_resolution.pdf')
 
     c2 = rootutils.new_canvas()
+    c2.SetLeftMargin(0.15)
     purity_legend = ROOT.TLegend(0.7, 0.9, 0.9, 0.98)
-    colors = [1,2,3,4,5,6]
+    colors = [1,2,3,4,6,7,8]
     for iMva, mva_tag in enumerate(purity_graphs):
-      purity_graphs[mva_tag].SetTitle(mva_tag)
+      purity_graphs[mva_tag].SetTitle(f'{mva_tag};signal eff.;purity')
       if iMva == 0: purity_graphs[mva_tag].Draw("APL")
       else: purity_graphs[mva_tag].Draw("PL")
       purity_graphs[mva_tag].SetLineColor(colors[iMva])
@@ -548,10 +551,11 @@ def evaluate_significance_with_resolution(info_mvas, draw=True, tree_type='test_
     c2.SaveAs('plots/purity_with_resolution.pdf')
 
     c3 = rootutils.new_canvas()
+    c3.SetLeftMargin(0.15)
     resolution_legend = ROOT.TLegend(0.7, 0.9, 0.9, 0.98)
-    colors = [1,2,3,4,5,6]
+    colors = [1,2,3,4,6,7,8]
     for iMva, mva_tag in enumerate(resolution_graphs):
-      resolution_graphs[mva_tag].SetTitle(mva_tag)
+      resolution_graphs[mva_tag].SetTitle(f'{mva_tag};signal eff.;signal resolution')
       if iMva == 0: resolution_graphs[mva_tag].Draw("APL")
       else: resolution_graphs[mva_tag].Draw("PL")
       resolution_graphs[mva_tag].SetLineColor(colors[iMva])
@@ -665,11 +669,12 @@ def evaluate_significance(info_mvas, draw=True, tree_type='test_tree'):
       if y_max.value > purity_min_max[1]: purity_min_max[1] = y_max.value
   # Draw graphs
   if draw:
-    c1 = ROOT.TCanvas('c1', 'c1', 500, 500)
+    c1 = rootutils.new_canvas()
+    c1.SetLeftMargin(0.15)
     significance_legend = ROOT.TLegend(0.7, 0.9, 0.9, 0.98)
-    colors = [1,2,3,4,5,6]
+    colors = [1,2,3,4,6,7,8]
     for iMva, mva_tag in enumerate(significance_graphs):
-      significance_graphs[mva_tag].SetTitle(mva_tag)
+      significance_graphs[mva_tag].SetTitle(f'{mva_tag};signal eff.;significance')
       if iMva == 0: significance_graphs[mva_tag].Draw("APL")
       else: significance_graphs[mva_tag].Draw("PL")
       significance_graphs[mva_tag].SetLineColor(colors[iMva])
@@ -682,10 +687,11 @@ def evaluate_significance(info_mvas, draw=True, tree_type='test_tree'):
     c1.SaveAs('plots/significances.pdf')
 
     c2 = ROOT.TCanvas('c2', 'c2', 500, 500)
+    c2.SetLeftMargin(0.15)
     purity_legend = ROOT.TLegend(0.7, 0.9, 0.9, 0.98)
-    colors = [1,2,3,4,5,6]
+    colors = [1,2,3,4,6,7,8]
     for iMva, mva_tag in enumerate(purity_graphs):
-      purity_graphs[mva_tag].SetTitle(mva_tag)
+      purity_graphs[mva_tag].SetTitle(f'{mva_tag};signal eff.;purity')
       if iMva == 0: purity_graphs[mva_tag].Draw("APL")
       else: purity_graphs[mva_tag].Draw("PL")
       purity_graphs[mva_tag].SetLineColor(colors[iMva])
@@ -718,14 +724,26 @@ def evaluate_correlation(info_mvas, draw=True, tree_type='test_tree'):
     # Find mva thresholds
     signal_fractions = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
     mva_thresholds = find_signal_fraction_thresholds(signal_fractions, tmva_chain, mass_name, mva_name, label_name, weight_name)
+    mva_max = tmva_chain.GetMaximum(mva_name)
+    mva_thresholds.append(mva_max)
     # Make mass histograms with thresholds
     mva_hists = {}
     signal_hists = {}
     ROOT.gStyle.SetOptStat(0)
+    #print(f'mva_thresholds: {mva_thresholds}')
+    # Find min mva
     for imva, mva_threshold in enumerate(mva_thresholds):
       # Background hists
       hist = ROOT.TH1F("hist_"+str(mva_threshold),"hist_"+str(mva_threshold),160,100,180)
-      entries = tmva_chain.Draw(mass_name+">>hist_"+str(mva_threshold),label_name+"==0&&"+mva_name+">"+str(mva_threshold)+"","goff")
+      if imva == 0:
+        entries = tmva_chain.Draw(mass_name+">>hist_"+str(mva_threshold),f'{label_name}==0&&{mva_name}<{mva_threshold}',"goff")
+        #print(f'{label_name}==0&&{mva_name}<{mva_threshold}, {entries}')
+      elif imva == len(mva_thresholds)-1:
+        entries = tmva_chain.Draw(mass_name+">>hist_"+str(mva_threshold),f'{label_name}==0&&{mva_name}>{mva_threshold}',"goff")
+        #print(f'{label_name}==0&&{mva_name}>{prev_mva_threshold}, {entries}')
+      else:
+        entries = tmva_chain.Draw(mass_name+">>hist_"+str(mva_threshold),f'{label_name}==0&&{mva_name}<{mva_threshold}&&{mva_name}>{prev_mva_threshold}',"goff")
+        #print(f'{label_name}==0&&{mva_name}<{mva_threshold}&&{mva_name}>{prev_mva_threshold}, {entries}')
       # Normalize histogram
       sum_weight = hist.GetSumOfWeights()
       if sum_weight != 0:
@@ -733,7 +751,16 @@ def evaluate_correlation(info_mvas, draw=True, tree_type='test_tree'):
         mva_hists[mva_threshold] = hist
       # Signal hists
       signal_hist = ROOT.TH1F("signal_hist_"+str(mva_threshold),"signal_hist_"+str(mva_threshold),160,100,180)
-      entries = tmva_chain.Draw(mass_name+">>signal_hist_"+str(mva_threshold),label_name+"==1&&"+mva_name+">"+str(mva_threshold)+"","goff")
+      if imva == 0:
+        #print(f'{label_name}==1&&{mva_name}<{mva_threshold}')
+        entries = tmva_chain.Draw(mass_name+">>signal_hist_"+str(mva_threshold),f'{label_name}==1&&{mva_name}<{mva_threshold}',"goff")
+      elif imva == len(mva_thresholds)-1:
+        #print(f'{label_name}==1&&{mva_name}>{prev_mva_threshold}')
+        entries = tmva_chain.Draw(mass_name+">>signal_hist_"+str(mva_threshold),f'{label_name}==1&&{mva_name}>{mva_threshold}',"goff")
+      else:
+        #print(f'{label_name}==1&&{mva_name}<{mva_threshold}&&{mva_name}>{prev_mva_threshold}')
+        entries = tmva_chain.Draw(mass_name+">>signal_hist_"+str(mva_threshold),f'{label_name}==1&&{mva_name}<{mva_threshold}&&{mva_name}>{prev_mva_threshold}',"goff")
+      prev_mva_threshold = mva_threshold
       # Normalize histogram
       sum_weight = signal_hist.GetSumOfWeights()
       if sum_weight != 0:
@@ -761,9 +788,12 @@ def evaluate_correlation(info_mvas, draw=True, tree_type='test_tree'):
       legend = ROOT.TLegend(0.7, 0.7, 0.9, 0.98)
       bkg_hist = ROOT.TH1F("bkg_hist","Background dist.;m_{llg} [GeV]",160,100,180)
       bkg_hist.Draw()
-      for imva, mva_threshold in enumerate(mva_thresholds):
+      colors = [ROOT.kGreen-8, ROOT.kGreen-5, ROOT.kGreen+4,
+                ROOT.kBlue-10, ROOT.kBlue-7, ROOT.kBlue,
+                ROOT.kRed-10, ROOT.kRed-7, ROOT.kRed,]
+      for imva, mva_threshold in enumerate(mva_hists):
         hist = mva_hists[mva_threshold]
-        hist.SetLineColor(imva+1)
+        hist.SetLineColor(colors[imva])
         hist.Draw('same')
         legend.AddEntry(hist)
       legend.Draw()
@@ -778,11 +808,11 @@ def evaluate_correlation(info_mvas, draw=True, tree_type='test_tree'):
       c2 = rootutils.new_canvas()
       legend = ROOT.TLegend(0.7, 0.7, 0.9, 0.98)
       signal_hist = ROOT.TH1F("signal_hist","Signal dist.;m_{llg} [GeV]",160,100,180)
-      signal_hist.Draw()
-      for imva, mva_threshold in enumerate(mva_thresholds):
+      signal_hist.Draw('hist')
+      for imva, mva_threshold in enumerate(signal_hists):
         hist = signal_hists[mva_threshold]
-        hist.SetLineColor(imva+1)
-        hist.Draw('same')
+        hist.SetLineColor(colors[imva])
+        hist.Draw('same hist')
         legend.AddEntry(hist)
       legend.Draw()
       rootutils.set_max_th1()
@@ -796,14 +826,15 @@ if __name__ == "__main__":
   # Load data
   # mva_info = {'train': {'x':, 'y':, 'yhat':, 'observable':, 'weight':}, 'test': {...}, 'name':, 'filename':, names: {'train_tree':, 'test_tree':, 'y':, 'yhat':, 'observable': 'weight':, 'x':}}
   #tmva_bdt = load_tmva_dict('ntuples_mva/TMVA_bdt.root', 'BDT', 'tmva bdt')
-  tmva_bdt = load_tmva_eval_dict('ntuples_mva/TMVA_bdt.root', 'tmva_evaluate_bdt.root', 'BDT', 'tmva bdt')
+  #tmva_bdt = load_tmva_eval_dict('ntuples_mva/TMVA_bdt.root', 'tmva_evaluate_bdt.root', 'BDT', 'tmva bdt')
   #tmva_nn = load_tmva_res_dict('ntuples_mva/TMVA_nn.root', 'DNN', 'tmva nn')
-  tmva_nn = load_tmva_eval_res_dict('ntuples_mva/TMVA_nn.root', 'tmva_evaluate_nn.root','DNN', 'tmva nn')
-  gbdt = load_mva_dict('ntuples_mva/gbdt.root', 'gbdt')
-  xgbdt = load_mva_dict('ntuples_mva/xgbdt.root', 'xgbdt')
+  #tmva_nn = load_tmva_eval_res_dict('ntuples_mva/TMVA_nn.root', 'tmva_evaluate_nn.root','DNN', 'tmva nn')
+  #gbdt = load_mva_dict('ntuples_mva/gbdt.root', 'gbdt')
+  #xgbdt = load_mva_dict('ntuples_mva/xgbdt.root', 'xgbdt')
   #torch_nn = load_mva_dict('ntuples_mva/torch_nn.root', 'torch nn')
   #fine_nn = load_mva_dict('ntuples_mva/fine_nn.root', 'fine nn')
   #torch_nn_batch32 = load_mva_dict('ntuples_mva/torch_nn_batch32.root', 'torch nn (batch=32)')
+  #torch_nn_batch4096 = load_mva_dict('ntuples_mva/torch_nn_batch4096.root', 'torch nn (batch=4096)')
   #fine_nn_batch32 = load_mva_dict('ntuples_mva/fine_nn_batch32.root', 'fine nn (batch=32)')
   #fine_nn_batch32_loss_signi = load_mva_dict('ntuples_mva/fine_nn_loss1_batch32.root', 'fine nn loss signi (batch=32)')
   #fine_nn_batch32_loss_z = load_mva_dict('ntuples_mva/fine_nn_loss2_batch32.root', 'fine nn loss z (batch=32)')
@@ -816,15 +847,33 @@ if __name__ == "__main__":
   #info_mvas = [tmva_bdt, tmva_nn, gbdt, xgbdt, torch_nn_batch32, fine_nn]
   #info_mvas = [tmva_bdt, torch_nn_batch32]
   #info_mvas = [tmva_bdt, tmva_nn, fine_nn_batch128_loss_signi_res, gbdt, xgbdt]
-  info_mvas = [tmva_bdt, tmva_nn, gbdt, xgbdt]
+  #info_mvas = [tmva_bdt, tmva_nn, gbdt, xgbdt, torch_nn_batch4096, test_mva]
+  #info_mvas = [tmva_bdt, gbdt, xgbdt, test_mva]
   #info_mvas = [tmva_nn, fine_nn_batch32, fine_nn_batch32_loss_signi, fine_nn_batch32_loss_z, fine_nn_batch32_loss_purity]
   #info_mvas = [tmva_bdt, tmva_nn, fine_nn_batch128_loss_z, fine_nn_batch128_loss_signi_res, test_mva]
   #info_mvas = [tmva_bdt, tmva_nn, gbdt, xgbdt, fine_nn_batch128_loss_signi_res]
 
-  #evaluate_roc(info_mvas) # unweighted roc because of negative weights
-  #evaluate_overtraining(info_mvas)
+  tmva_bdt = load_tmva_eval_dict('ntuples_mva/TMVA_bdt_run2.root', 'tmva_evaluate_bdt_run2.root', 'BDT', 'tmva bdt')
+  gbdt = load_mva_dict('ntuples_mva/gbdt_run2.root', 'gbdt')
+  xgbdt = load_mva_dict('ntuples_mva/xgbdt_run2.root', 'xgbdt')
+  disco_mva = load_mva_dict('nn_evaluate.root', 'nn disco')
+  signi_mva = load_mva_dict('nn_loss203_run2.root', 'signi mva')
+  info_mvas = [tmva_bdt, gbdt, xgbdt, disco_mva, signi_mva]
+  #info_mvas = [tmva_bdt]
+
+  #disco_mva = load_mva_dict('ntuples_mva/nn_runs_loss201.root', 'disco')
+  #logsigni_mva = load_mva_dict('ntuples_mva/nn_runs_loss202.root', 'logsigni')
+  #signi_mva = load_mva_dict('ntuples_mva/nn_runs_loss203.root', 'signi')
+  #info_mvas = [disco_mva, logsigni_mva, signi_mva]
+  ##info_mvas = [tmva_bdt]
+
+  evaluate_roc(info_mvas) # unweighted roc because of negative weights
+  evaluate_overtraining(info_mvas)
   evaluate_significance_with_resolution(info_mvas, tree_type='test_full_tree')
   evaluate_significance(info_mvas, tree_type='test_full_tree')
-  #evaluate_correlation(info_mvas, tree_type='test_full_tree')
+  evaluate_correlation(info_mvas, tree_type='test_full_tree')
+  #evaluate_significance_with_resolution(info_mvas, tree_type='train_tree')
+  #evaluate_significance(info_mvas, tree_type='train_tree')
+  #evaluate_correlation(info_mvas, tree_type='train_tree')
 
 

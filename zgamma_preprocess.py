@@ -129,21 +129,27 @@ if __name__=='__main__':
   #signal_files = '/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*GluGluHToZG*.root'
   #bkg_1_files = '/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*DYJetsToLL_M-50*madgraphMLM*.root'
   #bkg_2_files = '/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*ZGToLLG_01J_5f*.root'
-  signal_files = '/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*GluGluHToZG*M-125*.root'
-  bkg_1_files = '/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*DYJetsToLL_M-50*madgraphMLM*.root'
-  bkg_2_files = '/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*ZGToLLG_01J_5f_TuneCP5*.root'
-  write_ntuples([signal_files],
+  signal_files = []
+  bkg_files = []
+  for year in [2016, '2016APV', 2017, 2018]:
+    signal_file = f'/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/{year}/mc/skim_llg/*GluGluHToZG*M-125*.root'
+    signal_files.append(signal_file)
+    bkg_1_file = f'/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/{year}/mc/skim_llg/*DYJetsToLL_M-50*madgraphMLM*.root'
+    bkg_2_file = f'/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/{year}/mc/skim_llg/*ZGToLLG_01J_5f_TuneCP5*.root'
+    bkg_files.append(bkg_1_file)
+    bkg_files.append(bkg_2_file)
+  write_ntuples(signal_files,
       cuts,
-      'ntuples/train_decorr_sig.root',
+      'ntuples/train_decorr_sig_run2.root',
       defines,
       'tree',
       branches)
-  write_ntuples([bkg_1_files, bkg_2_files],
+  write_ntuples(bkg_files,
       cuts,
-      'ntuples/train_decorr_bak.root',
+      'ntuples/train_decorr_bak_run2.root',
       defines,
       'tree',
       branches)
 
-  rootutils.plot_variables('ntuples/train_decorr_sig.root', 'tree', branches, out_folder = 'plots')
-  rootutils.plot_variables('ntuples/train_decorr_bak.root', 'tree', branches, out_folder = 'plots')
+  #rootutils.plot_variables('ntuples/train_decorr_sig_run2.root', 'tree', branches, out_folder = 'plots')
+  #rootutils.plot_variables('ntuples/train_decorr_bak_run2.root', 'tree', branches, out_folder = 'plots')
