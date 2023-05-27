@@ -16,6 +16,7 @@ import xgboost
 from torch.utils.tensorboard import SummaryWriter
 import evaluate
 import Disco
+import time
 
 def unnormalize(values, norm_weights):
   feature_array = copy.deepcopy(values)
@@ -446,15 +447,22 @@ def train(dataloader, model, loss_fn, optimizer, use_weight_in_loss = False, use
     model.train()
     avg_loss = 0.
     for batch, (feature, label, spec) in enumerate(dataloader):
+        # feature: [nbatch, nfeature], no_device
+        # label: [nbatch, nlabel], no_device
+        # spec: [nbatch, nspec], no_device
+
         # torch.max returns ([max value], [index of max])
         X, y = feature.to(device), torch.max(label,1)[1].to(device)
         #X, y = feature.to(device), label.to(device)
+        # X: [batch, nfeature], device
+        # y: [batch], device
 
         #print(f'pre-y max: {torch.max(label,1)}')
 
         # Forward pass
         # Compute prediction error
         pred = model(X)
+        # pred: [batch, 1], device
         #print('out:', y.unsqueeze(1))
         #print('feature:', feature)
         #print('label:', label)
@@ -702,7 +710,8 @@ if __name__ == "__main__":
   #test_filename = 'test_sample_run2_0p05.root'
   #test_full_filename = 'test_full_sample_run2_0p05.root'
 
-  do_test = False
+  do_test = True
+
 
   #batch_size = 1
   # train_loss
@@ -881,6 +890,7 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 
+  start_time = time.time()
   #epochs = 50
   #test(train_dataloader, model, loss_fn, train_loss!=0)
   if do_test: epochs = 1
@@ -888,7 +898,7 @@ if __name__ == "__main__":
     if iEpoch != 0 or do_test:
       print(f"Epoch {iEpoch+1}\n-------------------------------")
       train(train_dataloader, model, loss_fn, optimizer, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
-    if iEpoch % eval_epoch == 0:
+    if iEpoch % eval_epoch and not do_test == 0:
       # Evaluate
       results = {'train': {}, 'test': {}}
       filename = 'trash/evaluate.root'
@@ -938,6 +948,9 @@ if __name__ == "__main__":
       if do_test == False:
         model_filename = writer_foldername+f'/model_epoch_{iEpoch}.pt'
         torch.save(model.state_dict(), model_filename)
+
+  elapsed_time = time.time() - start_time
+  print(f'Training time: {elapsed_time}')
 
   # Save train 
   train_feature_array = train_dataset.feature_array
