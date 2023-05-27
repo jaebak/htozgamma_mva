@@ -7,13 +7,15 @@ if __name__ == '__main__':
   ROOT.EnableImplicitMT()
 
   print('Make weights that converts input distribution into target distribution')
-  target_filename = 'ntuples/train_decorr_sig.root'
+  #target_filename = 'ntuples/train_decorr_sig.root'
+  target_filename = 'ntuples/train_decorr_sig_run2.root'
   target_tree = 'tree'
   target_branch = 'llg_mass'
   target_weight = 'w_lumi'
   target_cut = '1'
 
-  input_filename = 'ntuples/train_decorr_bak.root'
+  #input_filename = 'ntuples/train_decorr_bak.root'
+  input_filename = 'ntuples/train_decorr_bak_run2.root'
   input_tree = 'tree'
   input_branch = 'llg_mass'
   input_weight = 'w_lumi'
@@ -21,7 +23,8 @@ if __name__ == '__main__':
 
   nbins = 160
   output_weight_filename = 'shape_wgt.root'
-  output_filename = 'ntuples/train_decorr_bak_shapewgt.root'
+  #output_filename = 'ntuples/train_decorr_bak_shapewgt.root'
+  output_filename = 'ntuples/train_decorr_bak_shapewgt_run2.root'
   output_weight = 'weight'
 
   # Open files

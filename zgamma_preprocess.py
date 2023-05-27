@@ -78,6 +78,24 @@ float get_l2_rapidity(RVec<float> el_pt, RVec<float> el_eta,
   return (mu_pt[ll_i1[0]] > mu_pt[ll_i2[0]]) ? mu_eta[ll_i2[0]] : mu_eta[ll_i1[0]];
 }
 
+float get_l1_phi(RVec<float> el_pt, RVec<float> el_phi, 
+    RVec<float> mu_pt, RVec<float> mu_phi, RVec<int> ll_lepid, 
+    RVec<int> ll_i1, RVec<int> ll_i2) {
+  if (ll_lepid[0]==11) {
+    return (el_pt[ll_i1[0]] > el_pt[ll_i2[0]]) ? el_phi[ll_i1[0]] : el_phi[ll_i2[0]];
+  }
+  return (mu_pt[ll_i1[0]] > mu_pt[ll_i2[0]]) ? mu_phi[ll_i1[0]] : mu_phi[ll_i2[0]];
+}
+
+float get_l2_phi(RVec<float> el_pt, RVec<float> el_phi, 
+    RVec<float> mu_pt, RVec<float> mu_phi, RVec<int> ll_lepid, 
+    RVec<int> ll_i1, RVec<int> ll_i2) {
+  if (ll_lepid[0]==11) {
+    return (el_pt[ll_i1[0]] > el_pt[ll_i2[0]]) ? el_phi[ll_i2[0]] : el_phi[ll_i1[0]];
+  }
+  return (mu_pt[ll_i1[0]] > mu_pt[ll_i2[0]]) ? mu_phi[ll_i2[0]] : mu_phi[ll_i1[0]];
+}
+
 float get_mass_err(RVec<float> llphoton_l1_masserr, RVec<float> llphoton_l2_masserr, RVec<float> llphoton_ph_masserr) {
   return sqrt(pow(llphoton_l1_masserr[0],2)+pow(llphoton_l2_masserr[0],2)+pow(llphoton_ph_masserr[0],2));
 }
@@ -88,6 +106,15 @@ float get_flavor(RVec<int> ll_lepid) {
   return 0.;
 }
 
+float get_llg_ptt(RVec<float> photon_pt, RVec<float> photon_eta, RVec<float> photon_phi, 
+                  RVec<float> llphoton_pt, RVec<float> llphoton_eta, RVec<float> llphoton_phi,
+                  RVec<float> ll_pt, RVec<float> ll_eta, RVec<float> ll_phi) {
+  TVector3 gamma; gamma.SetPtEtaPhi(photon_pt[0], photon_eta[0], photon_phi[0]);
+  TVector3 higgs; higgs.SetPtEtaPhi(llphoton_pt[0], llphoton_eta[0], llphoton_phi[0]);
+  TVector3 zboson; zboson.SetPtEtaPhi(ll_pt[0], ll_eta[0], ll_phi[0]);
+  gamma.SetZ(0); higgs.SetZ(0); zboson.SetZ(0);
+  return higgs.Cross((zboson-gamma).Unit()).Mag();
+}
 """)
 
 if __name__=='__main__':
@@ -120,10 +147,20 @@ if __name__=='__main__':
              ('llg_mass','llphoton_m[0]'),
              ('llg_mass_err','get_mass_err(llphoton_l1_masserr,llphoton_l2_masserr,llphoton_ph_masserr)'),
              ('llg_flavor', 'get_flavor(ll_lepid)'),
-             ('gamma_pt', 'photon_pt[0]')
+             ('gamma_pt', 'photon_pt[0]'),
+             ('llg_eta', 'llphoton_eta[0]'),
+             ('llg_phi', 'llphoton_phi[0]'),
+             ('llg_ptt', 'get_llg_ptt(photon_pt, photon_eta, photon_phi, llphoton_pt, llphoton_eta, llphoton_phi, ll_pt, ll_eta, ll_phi)'),
+             ('z_eta', 'll_eta[0]'),
+             ('z_phi', 'll_phi[0]'),
+             ('l1_phi', 'get_l1_phi(el_pt,el_phi,mu_pt,mu_phi,ll_lepid,ll_i1,ll_i2)'),
+             ('l2_phi', 'get_l2_phi(el_pt,el_phi,mu_pt,mu_phi,ll_lepid,ll_i1,ll_i2)'),
+             ('gamma_eta', 'photon_eta[0]'),
+             ('gamma_phi', 'photon_phi[0]'),
              ]
   branches = ('photon_mva','min_dR','max_dR','pt_mass','cosTheta','costheta',
-      'phi','photon_res','photon_rapidity','l1_rapidity','l2_rapidity','decorr_photon_pt','photon_pt_mass','w_lumi', 'llg_mass', 'llg_mass_err', 'llg_flavor', 'gamma_pt')
+      'phi','photon_res','photon_rapidity','l1_rapidity','l2_rapidity','decorr_photon_pt','photon_pt_mass','w_lumi', 'llg_mass', 'llg_mass_err', 'llg_flavor', 'gamma_pt',
+      'llg_eta', 'llg_phi', 'llg_ptt', 'z_eta', 'z_phi', 'l1_phi', 'l2_phi', 'gamma_eta', 'gamma_phi')
   #define drmax, pt_mass, first index
   #make n-tuples
   #signal_files = '/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*GluGluHToZG*.root'
@@ -132,6 +169,7 @@ if __name__=='__main__':
   signal_files = []
   bkg_files = []
   for year in [2016, '2016APV', 2017, 2018]:
+  #for year in [2017]:
     signal_file = f'/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/{year}/mc/skim_llg/*GluGluHToZG*M-125*.root'
     signal_files.append(signal_file)
     bkg_1_file = f'/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/{year}/mc/skim_llg/*DYJetsToLL_M-50*madgraphMLM*.root'
@@ -141,12 +179,14 @@ if __name__=='__main__':
   write_ntuples(signal_files,
       cuts,
       'ntuples/train_decorr_sig_run2.root',
+      #'ntuples/train_decorr_sig.root',
       defines,
       'tree',
       branches)
   write_ntuples(bkg_files,
       cuts,
       'ntuples/train_decorr_bak_run2.root',
+      #'ntuples/train_decorr_bak.root',
       defines,
       'tree',
       branches)

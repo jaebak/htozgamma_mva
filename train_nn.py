@@ -234,6 +234,39 @@ class entropy_bkg_disco_signi_res2_loss(nn.Module):
     #print(f'bce: {bce}, disco: {disco}, signi_res: {signi_res}, loss: {loss}')
     return loss
 
+class entropy_bkg_disco_signi_res3_loss(nn.Module):
+  # Try 20. to increase decorrelation
+  def __init__(self, disco_factor = 10., signi_divide = 6000.):
+    super(entropy_bkg_disco_signi_res3_loss, self).__init__()
+    self.bce_loss = nn.BCELoss()
+    self.disco_factor = disco_factor
+    self.signi_divide = signi_divide
+
+  def forward(self, output, target, weight, resolution, mass):
+    # output/target/mass = [[single-value], [single-value], ...]
+    output_list = output.squeeze()
+    mass_list = mass.squeeze()
+    normedweight = torch.tensor([1.]*len(mass)).to(device)
+    # Ignore signal mass correlation
+    mask = (target.squeeze() == 0)
+    mass_list = mass_list[mask]
+    output_list = output_list[mask]
+    normedweight = normedweight[mask]
+    #print(target.squeeze()[mask], mass_list)
+    disco = Disco.distance_corr(mass_list, output_list, normedweight)
+    bce = self.bce_loss(output, target)
+    signal = torch.sum(output * target * weight)
+    #print(f'resolution: {resolution}, output: {output.squeeze()}, target: {target.squeeze()}')
+    avg_signal_res = torch.sum(output.squeeze() * target.squeeze() * resolution) / torch.sum(output.squeeze() * target.squeeze())
+    bkg = torch.sum(output * (1-target) * weight)
+    bkg_with_res = bkg * 2. * avg_signal_res
+    signi_res = torch.sqrt(signal+bkg_with_res)/signal
+    #print(f'signal: {signal} bkg: {bkg} avg_signal_res: {avg_signal_res} bkg_with_res: {bkg_with_res} signi_res: {signi_res}')
+    #print(f'sum_res: {torch.sum(output * target * resolution)}, sum: {torch.sum(output * target)}')
+    loss = bce + self.disco_factor * disco + signi_res / self.signi_divide
+    #print(f'bce: {bce}, disco: {disco*self.disco_factor}, signi_res: {signi_res/self.signi_divide}, loss: {loss}')
+    return loss
+
 class significance_loss(nn.Module):
   def __init__(self, eps = 1e-7):
     super(significance_loss, self).__init__()
@@ -653,11 +686,17 @@ if __name__ == "__main__":
   #device = "cpu"
   device = "cuda"
 
-  train_filename = 'train_sample_run2.root'
-  test_filename = 'test_sample_run2.root'
-  test_full_filename = 'test_full_sample_run2.root'
+  train_filename = 'train_sample_run2_winfull.root'
+  test_filename = 'test_sample_run2_winfull.root'
+  test_full_filename = 'test_full_sample_run2_winfull.root'
   log_dir = None
-  output_name = 'torch_nn'
+  output_name = 'torch_nn_winfull_decorH'
+
+  #train_filename = 'train_sample_run2.root'
+  #test_filename = 'test_sample_run2.root'
+  #test_full_filename = 'test_full_sample_run2.root'
+  #log_dir = None
+  #output_name = 'torch_nn'
 
   #train_filename = 'train_sample_run2_0p05.root'
   #test_filename = 'test_sample_run2_0p05.root'
@@ -673,8 +712,11 @@ if __name__ == "__main__":
   # 200: cross-entropy + disco
   # 201: cross-entropy + disco (only on bkg)
   # 202: cross-entropy + disco (only on bkg) + -ln(s/sqrt(s+b*res))
-  # 203: cross-entropy + disco (only on bkg) + sqrt(s+b*res)/s
-  train_loss = 203
+  # 203: cross-entropy + 5*disco (only on bkg) + 1/1000*sqrt(s+b*res)/s
+  # 204: (tune) cross-entropy + 10*disco (only on bkg) + 1/6000*sqrt(s+b*res)/s
+  # 205: (tune) cross-entropy + 20*disco (only on bkg) + 1/6000*sqrt(s+b*res)/s
+  # 206: (tune) cross-entropy + 40*disco (only on bkg) + 1/6000*sqrt(s+b*res)/s
+  train_loss = 206
   #log_dir = f'runs/loss{train_loss}'
   #output_name = f'nn_{log_dir}'.replace('/','_')
 
@@ -721,6 +763,24 @@ if __name__ == "__main__":
     use_res_in_loss = True
     use_weight_in_loss = True
     loss_filename = '_entropy_bkg_disco_signi_res2_loss'
+  elif train_loss == 204: 
+    loss_fn = entropy_bkg_disco_signi_res3_loss()
+    use_mass_in_loss = True
+    use_res_in_loss = True
+    use_weight_in_loss = True
+    loss_filename = '_entropy_bkg_disco_signi_res3_loss'
+  elif train_loss == 205: 
+    loss_fn = entropy_bkg_disco_signi_res3_loss(disco_factor=20.)
+    use_mass_in_loss = True
+    use_res_in_loss = True
+    use_weight_in_loss = True
+    loss_filename = '_entropy_bkg_disco_signi_loss205'
+  elif train_loss == 206: 
+    loss_fn = entropy_bkg_disco_signi_res3_loss(disco_factor=40.)
+    use_mass_in_loss = True
+    use_res_in_loss = True
+    use_weight_in_loss = True
+    loss_filename = '_entropy_bkg_disco_signi_loss205'
 
 
   if do_test == False:
@@ -729,7 +789,7 @@ if __name__ == "__main__":
 
   print(f"Using {device} device")
   torch.manual_seed(1)
-  model = SimpleNetwork(input_size=10, hidden_size=40, output_size=1).to(device)
+  model = SimpleNetwork(input_size=11, hidden_size=44, output_size=1).to(device)
   min_max_array = []
   if do_fine_tune == 1:
     load_tmva_model('dataset/weights/TMVAClassification_DNN.weights.xml', model, min_max_array)
@@ -741,7 +801,7 @@ if __name__ == "__main__":
                    #'photon_res', 
                    'llg_mass_err',
                    'photon_rapidity', 'l1_rapidity', 'l2_rapidity',
-                   'llg_flavor']
+                   'llg_flavor', 'gamma_pt']
   normalize_max_min = [[-0.57861328125,0.98583984375],
                       [0.400207489729,3.32512640953],
                       [0.000612989999354,4.14180803299],
@@ -752,7 +812,8 @@ if __name__ == "__main__":
                       [-2.49267578125,2.4921875],
                       [-2.49072265625,2.4814453125],
                       [-2.49072265625,2.50830078125],
-                      [1., 2.]]
+                      [1., 2.],
+                      [15.015657, 295.22623]]
 
   #model.eval()
   #with torch.no_grad():

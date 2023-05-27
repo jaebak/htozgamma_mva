@@ -11,16 +11,19 @@ def train_bdt(train_filename, test_filename, tmva_filename):
   factory = TMVA.Factory('TMVAClassification', output,
                          '!V:ROC:!Correlations:!Silent:Color:'
                          '!DrawProgressBar:AnalysisType=Classification')
-  dataloader = TMVA.DataLoader('dataset')
+  dataloader = TMVA.DataLoader('dataset_simple')
   dataloader.AddVariable("photon_mva",'F')
-  dataloader.AddVariable("min_dR",'F')
-  dataloader.AddVariable("pt_mass",'F')
-  dataloader.AddVariable("cosTheta",'F')
-  dataloader.AddVariable("costheta",'F')
-  dataloader.AddVariable("photon_res",'F')
-  dataloader.AddVariable("photon_rapidity",'F')
+  dataloader.AddVariable("llg_ptt",'F')
+  dataloader.AddVariable("llg_eta",'F')
+  dataloader.AddVariable("llg_phi",'F')
+  dataloader.AddVariable("z_eta",'F')
+  dataloader.AddVariable("z_phi",'F')
   dataloader.AddVariable("l1_rapidity",'F')
+  dataloader.AddVariable("l1_phi",'F')
   dataloader.AddVariable("l2_rapidity",'F')
+  dataloader.AddVariable("l2_phi",'F')
+  dataloader.AddVariable("gamma_eta",'F')
+  dataloader.AddVariable("gamma_phi",'F')
   dataloader.SetBackgroundWeightExpression("w_lumi")
   dataloader.SetSignalWeightExpression("w_lumi")
   #dataloader.SetBackgroundWeightExpression("w_llg_mass")
@@ -312,7 +315,8 @@ def evaluate_mva_correlation(tmva_filename, mva_name):
 if __name__ == "__main__":
   
   #train_bdt("train_sample_run2.root", "test_sample_run2.root", "ntuples_mva/TMVA_bdt_run2.root")
-  train_bdt("train_sample_run2_winfull.root", "test_sample_run2_winfull.root", "ntuples_mva/TMVA_bdt_run2.root")
+  #train_bdt("train_sample_run2_win10.root", "test_sample_run2_win10.root", "ntuples_mva/TMVA_bdt_run2.root")
+  train_bdt("train_sample_run2_winfull.root", "test_sample_run2_winfull.root", "ntuples_mva/TMVA_simple_bdt_run2.root")
   #train_nn("train_sample_run2.root", "test_sample_run2.root", "ntuples_mva/TMVA_nn.root")
 
   #evaluate_mva_significance("ntuples_mva/TMVA_bdt.root", "BDT")

@@ -98,7 +98,7 @@ void parse_xml(string tmva_weights, vector<string> & tmva_variables, vector<stri
 using namespace TMVA;
 void use_tmva() {
 
-  // evaluate_mva = 1 is for bdt, evaluate_mva = 2 is for nn
+  // evaluate_mva = 1 is for bdt, evaluate_mva = 2 is for nn, evaluate_mva = 3 is for simple bdt
   int evaluate_mva = 1;
 
   // Load bdt tmva
@@ -106,7 +106,8 @@ void use_tmva() {
 
   //string input_train_root = "train_sample.root";
   //string input_train_tree = "train_tree";
-  string input_test_root = "test_full_sample.root";
+  //string input_test_root = "test_full_sample_run2.root";
+  string input_test_root = "test_full_sample_run2_winfull.root";
   string input_test_tree = "test_tree";
   string label = "classID";
 
@@ -114,13 +115,17 @@ void use_tmva() {
   string tmva_weights;
   string tmva_output;
   if (evaluate_mva == 1) {
-    output_root = "tmva_evaluate_bdt.root";
+    output_root = "tmva_evaluate_bdt_run2.root";
     tmva_weights = "dataset/weights/TMVAClassification_BDT.weights.xml";
     tmva_output = "BDT";
-  } else {
+  } else if (evaluate_mva == 2) {
     output_root = "tmva_evaluate_nn.root";
     tmva_weights = "dataset/weights/TMVAClassification_DNN.weights.xml";
     tmva_output = "DNN";
+  } else if (evaluate_mva == 3) {
+    output_root = "tmva_evaluate_simple_bdt_run2.root";
+    tmva_weights = "dataset_simple/weights/TMVAClassification_BDT.weights.xml";
+    tmva_output = "BDT";
   }
 
   //// For BDT

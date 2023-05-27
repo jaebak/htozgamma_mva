@@ -187,6 +187,36 @@ def load_tmva_eval_dict(train_test_filename, test_full_filename, mva_var_name, n
     'yhat': mva_var_name, 'observable': 'llg_mass', 'weight': 'w_lumi'}}
   return tmva
 
+def load_tmva_simple_eval_dict(train_test_filename, test_full_filename, mva_var_name, name):
+  tmva_train = {}
+  with uproot.open(train_test_filename) as tmva_file:
+    tmva_train['x'] = tmva_file['dataset_simple/TrainTree'].arrays(['photon_mva', 'llg_ptt', 'llg_eta', 'llg_phi', 'z_eta', 'z_phi', 'l1_rapidity', 'l1_phi', 'l2_rapidity', 'l2_phi', 'gamma_eta', 'gamma_phi'])
+    tmva_train['y'] = tmva_file['dataset_simple/TrainTree']['classID'].array()
+    tmva_train['yhat'] = tmva_file['dataset_simple/TrainTree'][mva_var_name].array()
+    tmva_train['observable'] = tmva_file['dataset_simple/TrainTree']['llg_mass'].array()
+    tmva_train['weight'] = tmva_file['dataset_simple/TrainTree']['w_lumi'].array()
+  tmva_test = {}
+  with uproot.open(train_test_filename) as tmva_file:
+    tmva_test['x'] = tmva_file['dataset_simple/TestTree'].arrays(['photon_mva', 'llg_ptt', 'llg_eta', 'llg_phi', 'z_eta', 'z_phi', 'l1_rapidity', 'l1_phi', 'l2_rapidity', 'l2_phi', 'gamma_eta', 'gamma_phi'])
+    tmva_test['y'] = tmva_file['dataset_simple/TestTree']['classID'].array()
+    tmva_test['yhat'] = tmva_file['dataset_simple/TestTree'][mva_var_name].array()
+    tmva_test['observable'] = tmva_file['dataset_simple/TestTree']['llg_mass'].array()
+    tmva_test['weight'] = tmva_file['dataset_simple/TestTree']['w_lumi'].array()
+  tmva_test_full = {}
+  with uproot.open(test_full_filename) as tmva_file:
+    tmva_test_full['x'] = tmva_file['test_tree'].arrays(['photon_mva', 'llg_ptt', 'llg_eta', 'llg_phi', 'z_eta', 'z_phi', 'l1_rapidity', 'l1_phi', 'l2_rapidity', 'l2_phi', 'gamma_eta', 'gamma_phi'])
+    tmva_test_full['y'] = tmva_file['test_tree']['classID'].array()
+    tmva_test_full['yhat'] = tmva_file['test_tree'][mva_var_name].array()
+    tmva_test_full['observable'] = tmva_file['test_tree']['llg_mass'].array()
+    tmva_test_full['weight'] = tmva_file['test_tree']['w_lumi'].array()
+  tmva = {'train': tmva_train, 'test': tmva_test, 'test_full': tmva_test_full, 'name': name,
+    'names': {'train_filename': train_test_filename, 'test_filename': train_test_filename, 'test_full_filename': test_full_filename,
+    'train_tree': 'dataset_simple/TrainTree', 'test_tree': 'dataset_simple/TestTree', 'test_full_tree': 'test_tree',
+    'y': 'classID', 
+    'x': ['photon_mva', 'llg_ptt', 'llg_eta', 'llg_phi', 'z_eta', 'z_phi', 'l1_rapidity', 'l1_phi', 'l2_rapidity', 'l2_phi', 'gamma_eta', 'gamma_phi'], 
+    'yhat': mva_var_name, 'observable': 'llg_mass', 'weight': 'w_lumi'}}
+  return tmva
+
 def load_tmva_res_dict(filename, mva_var_name, name):
   tmva_file = uproot.open(filename)
   tmva_train = {}
@@ -853,13 +883,18 @@ if __name__ == "__main__":
   #info_mvas = [tmva_bdt, tmva_nn, fine_nn_batch128_loss_z, fine_nn_batch128_loss_signi_res, test_mva]
   #info_mvas = [tmva_bdt, tmva_nn, gbdt, xgbdt, fine_nn_batch128_loss_signi_res]
 
+  tmva_simple_bdt = load_tmva_simple_eval_dict('ntuples_mva/TMVA_simple_bdt_run2.root', 'tmva_evaluate_simple_bdt_run2.root', 'BDT', 'tmva simple bdt')
   tmva_bdt = load_tmva_eval_dict('ntuples_mva/TMVA_bdt_run2.root', 'tmva_evaluate_bdt_run2.root', 'BDT', 'tmva bdt')
   gbdt = load_mva_dict('ntuples_mva/gbdt_run2.root', 'gbdt')
   xgbdt = load_mva_dict('ntuples_mva/xgbdt_run2.root', 'xgbdt')
-  disco_mva = load_mva_dict('nn_evaluate.root', 'nn disco')
+  #disco_mva = load_mva_dict('nn_evaluate.root', 'nn disco')
+  disco_mva = load_mva_dict('nn_loss201_run2.root', 'nn disco')
   signi_mva = load_mva_dict('nn_loss203_run2.root', 'signi mva')
-  info_mvas = [tmva_bdt, gbdt, xgbdt, disco_mva, signi_mva]
+  signi_i11_mva = load_mva_dict('nn_loss203_i11_run2.root', 'signi_i11 mva')
+  signi_i11_fullwin_mva = load_mva_dict('nn_loss203_i11_fullwin_run2.root', 'signi i11 fullwin mva')
+  info_mvas = [tmva_bdt, gbdt, disco_mva, signi_mva, signi_i11_mva, signi_i11_fullwin_mva, tmva_simple_bdt]
   #info_mvas = [tmva_bdt]
+  #info_mvas = [tmva_bdt, tmva_simple_bdt]
 
   #disco_mva = load_mva_dict('ntuples_mva/nn_runs_loss201.root', 'disco')
   #logsigni_mva = load_mva_dict('ntuples_mva/nn_runs_loss202.root', 'logsigni')
