@@ -232,7 +232,7 @@ class entropy_bkg_disco_signi_res2_loss(nn.Module):
     #print(f'signal: {signal} bkg: {bkg} avg_signal_res: {avg_signal_res} bkg_with_res: {bkg_with_res} signi_res: {signi_res}')
     #print(f'sum_res: {torch.sum(output * target * resolution)}, sum: {torch.sum(output * target)}')
     loss = bce + self.disco_factor * disco + signi_res / 1000
-    #print(f'bce: {bce}, disco: {disco}, signi_res: {signi_res}, loss: {loss}')
+    #print(f'bce: {bce}, disco: {self.disco_factor * disco}, signi_res: {signi_res / 1000}, loss: {loss}')
     return loss
 
 class entropy_bkg_disco_signi_res3_loss(nn.Module):
@@ -265,7 +265,48 @@ class entropy_bkg_disco_signi_res3_loss(nn.Module):
     #print(f'signal: {signal} bkg: {bkg} avg_signal_res: {avg_signal_res} bkg_with_res: {bkg_with_res} signi_res: {signi_res}')
     #print(f'sum_res: {torch.sum(output * target * resolution)}, sum: {torch.sum(output * target)}')
     loss = bce + self.disco_factor * disco + signi_res / self.signi_divide
-    #print(f'bce: {bce}, disco: {disco*self.disco_factor}, signi_res: {signi_res/self.signi_divide}, loss: {loss}')
+    #print(f'bce: {bce}, disco*f: {disco*self.disco_factor}, signi_res/d: {signi_res/self.signi_divide}, loss: {loss}')
+    return loss
+
+class entropy_weight_bkg_disco_signi_res_loss(nn.Module):
+  def __init__(self, disco_factor = 5., signi_divide = 1000.):
+    super(entropy_weight_bkg_disco_signi_res_loss, self).__init__()
+    self.bce_loss = nn.BCELoss(reduction='none')
+    self.disco_factor = disco_factor
+    self.signi_divide = signi_divide
+    self.weight_scale = 1.
+
+  def set_weight_scale(self, weights):
+    # weights = [weight]
+    total_weight = np.sum(weights)
+    total_entries = len(weights)
+    self.weight_scale = total_entries *1./ total_weight
+    #print(f'total_weight: {total_weight} total_entries: {total_entries} weight_scale: {self.weight_scale}')
+
+  def forward(self, output, target, weight, resolution, mass):
+    # output/target/mass = [[single-value], [single-value], ...]
+    output_list = output.squeeze()
+    mass_list = mass.squeeze()
+    normedweight = torch.tensor([1.]*len(mass)).to(device)
+    # Ignore signal mass correlation
+    mask = (target.squeeze() == 0)
+    mass_list = mass_list[mask]
+    output_list = output_list[mask]
+    normedweight = normedweight[mask]
+    #print(target.squeeze()[mask], mass_list)
+    disco = Disco.distance_corr(mass_list, output_list, normedweight)
+    bce = self.bce_loss(output, target)
+    bce_wgt = torch.mean(self.weight_scale * weight * bce)
+    signal = torch.sum(output * target * weight)
+    #print(f'resolution: {resolution}, output: {output.squeeze()}, target: {target.squeeze()}')
+    avg_signal_res = torch.sum(output.squeeze() * target.squeeze() * resolution) / torch.sum(output.squeeze() * target.squeeze())
+    bkg = torch.sum(output * (1-target) * weight)
+    bkg_with_res = bkg * 2. * avg_signal_res
+    signi_res = torch.sqrt(signal+bkg_with_res)/signal
+    #print(f'signal: {signal} bkg: {bkg} avg_signal_res: {avg_signal_res} bkg_with_res: {bkg_with_res} signi_res: {signi_res}')
+    #print(f'sum_res: {torch.sum(output * target * resolution)}, sum: {torch.sum(output * target)}')
+    loss = bce_wgt + self.disco_factor * disco + signi_res / self.signi_divide
+    #print(f'bce: {torch.mean(bce)}, bce_wgt: {bce_wgt} disco: {disco*self.disco_factor}, signi_res: {signi_res/self.signi_divide}, loss: {loss}')
     return loss
 
 class significance_loss(nn.Module):
@@ -280,12 +321,24 @@ class significance_loss(nn.Module):
     #print(f'signal: {signal} bkg: {bkg} loss: {loss}')
     return loss
 
+class lin_significance_loss(nn.Module):
+  def __init__(self, signi_divide = 100.):
+    super(lin_significance_loss, self).__init__()
+    self.signi_divide = signi_divide
+
+  def forward(self, output, target, weight):
+    signal = torch.sum(output * target * weight)
+    bkg = torch.sum(output * (1-target) * weight)
+    signi = torch.sqrt(signal+bkg)/signal
+    loss = signi / self.signi_divide
+    #print(f'signi: {signi} loss: {loss}')
+    return loss
+
 class significance_res_loss(nn.Module):
   def __init__(self, eps = 1e-7, res_weight = 1):
     super(significance_res_loss, self).__init__()
     self.eps = eps
     self.res_weight = res_weight
-
 
   def forward(self, output, target, weight, resolution):
     signal = torch.sum(output * target * weight)
@@ -295,6 +348,56 @@ class significance_res_loss(nn.Module):
     loss = (signal + bkg_with_res) / (signal * signal)
     org_loss = (signal + bkg) / (signal * signal)
     #print(f'signal: {signal} bkg: {bkg} avg_signal_res: {avg_signal_res} bkg_with_res: {bkg_with_res} org_loss: {org_loss} loss: {loss}')
+    return loss
+
+class lin_significance_res_loss(nn.Module):
+  def __init__(self, signi_divide = 500.):
+    super(lin_significance_res_loss, self).__init__()
+    self.signi_divide = signi_divide
+
+  def forward(self, output, target, weight, resolution):
+    signal = torch.sum(output * target * weight)
+    avg_signal_res = torch.sum(output.squeeze() * target.squeeze() * resolution) / torch.sum(output.squeeze() * target.squeeze())
+    bkg = torch.sum(output * (1-target) * weight)
+    bkg_with_res = bkg * 2. * avg_signal_res
+    signi_res = torch.sqrt(signal+bkg_with_res)/signal
+    loss = signi_res / self.signi_divide
+    #print(f'signal: {signal} bkg: {bkg} avg_signal_res: {avg_signal_res} bkg_with_res: {bkg_with_res} signi_res: {signi_res} loss: {loss}')
+    return loss
+
+class scaled_bce_signi_res_loss(nn.Module):
+  def __init__(self, signi_divide = 1./3):
+    super(scaled_bce_signi_res_loss, self).__init__()
+    self.bce_loss = nn.BCELoss(reduction='none')
+    self.signal_scale = 1.
+    self.bkg_scale = 1.
+    self.signi_divide = signi_divide
+
+  def set_scale(self, signal_nevents, bkg_nevents):
+    if signal_nevents > bkg_nevents: self.signal_scale = bkg_nevents * 1. /signal_nevents
+    else: self.bkg_scale = signal_nevents * 1. /bkg_nevents
+
+  def forward(self, output, target, weight, resolution):
+    #print(f'output: {output.shape}')
+    #print(f'target: {target.shape}')
+    with torch.no_grad():
+      weight = target.detach().clone()
+      weight[weight==1.] = self.signal_scale
+      weight[weight==0.] = self.bkg_scale
+    #print(f'weight: {weight.shape}')
+    #print(f'weight: {weight[:30]}')
+    #print(f'target: {target[:30]}')
+    bce = self.bce_loss(output, target)
+    wgt_bce = torch.mean(weight * bce)
+    signal = torch.sum(output * target * weight)
+    avg_signal_res = torch.sum(output.squeeze() * target.squeeze() * resolution) / torch.sum(output.squeeze() * target.squeeze())
+    bkg = torch.sum(output * (1-target) * weight)
+    bkg_with_res = bkg * 2. * avg_signal_res
+    signi_res = torch.sqrt(signal+bkg_with_res)/signal
+    #print(f'bce: {bce.shape}')
+    #print(f'weight*bce: {(weight * bce).shape}')
+    loss =  wgt_bce + signi_res / self.signi_divide
+    #print(f'wgt_bce: {wgt_bce} signi_res: {signi_res/self.signi_divide} loss: {loss}')
     return loss
 
 class z_loss(nn.Module):
@@ -319,6 +422,74 @@ class purity_loss(nn.Module):
     bkg = torch.sum(output * (1-target) * weight)
     loss =  (signal + bkg) / signal
     #print(f'signal: {signal} bkg: {bkg} loss: {loss}')
+    return loss
+
+class weighted_bce_loss(nn.Module):
+  def __init__(self):
+    super(weighted_bce_loss, self).__init__()
+    self.bce_loss = nn.BCELoss(reduction='none')
+
+  def forward(self, output, target, weight):
+    #print(f'output: {output.shape}')
+    #print(f'target: {target.shape}')
+    #print(f'weight: {weight.shape}')
+    bce = self.bce_loss(output, target)
+    #print(f'bce: {bce.shape}')
+    #print(f'weight*bce: {(weight * bce).shape}')
+    loss = torch.mean(weight * bce)
+    #print(f'loss: {loss}')
+    return loss
+
+class weighted_scaled_bce_loss(nn.Module):
+  def __init__(self):
+    super(weighted_scaled_bce_loss, self).__init__()
+    self.bce_loss = nn.BCELoss(reduction='none')
+    self.weight_scale = 1.
+
+  def set_weight_scale(self, weights):
+    # weights = [weight]
+    total_weight = np.sum(weights)
+    total_entries = len(weights)
+    self.weight_scale = total_entries *1./ total_weight
+    #print(f'total_weight: {total_weight} total_entries: {total_entries} weight_scale: {self.weight_scale}')
+
+  def forward(self, output, target, weight):
+    #print(f'output: {output.shape}')
+    #print(f'target: {target.shape}')
+    #print(f'weight: {weight.shape}')
+    bce = self.bce_loss(output, target)
+    #print(f'bce: {bce.shape}')
+    #print(f'weight*bce: {(weight * bce).shape}')
+    loss = torch.mean(self.weight_scale * weight * bce)
+    #print(f'loss: {loss}')
+    return loss
+
+class scaled_bce_loss(nn.Module):
+  def __init__(self):
+    super(scaled_bce_loss, self).__init__()
+    self.bce_loss = nn.BCELoss(reduction='none')
+    self.signal_scale = 1.
+    self.bkg_scale = 1.
+
+  def set_scale(self, signal_nevents, bkg_nevents):
+    if signal_nevents > bkg_nevents: self.signal_scale = bkg_nevents * 1. /signal_nevents
+    else: self.bkg_scale = signal_nevents * 1. /bkg_nevents
+
+  def forward(self, output, target, weight):
+    #print(f'output: {output.shape}')
+    #print(f'target: {target.shape}')
+    with torch.no_grad():
+      weight = target.detach().clone()
+      weight[weight==1.] = self.signal_scale
+      weight[weight==0.] = self.bkg_scale
+    #print(f'weight: {weight.shape}')
+    #print(f'weight: {weight[:30]}')
+    #print(f'target: {target[:30]}')
+    bce = self.bce_loss(output, target)
+    #print(f'bce: {bce.shape}')
+    #print(f'weight*bce: {(weight * bce).shape}')
+    loss = torch.mean(weight * bce)
+    #print(f'loss: {loss}')
     return loss
     
 
@@ -694,12 +865,6 @@ if __name__ == "__main__":
   #device = "cpu"
   device = "cuda"
 
-  train_filename = 'train_sample_run2_winfull.root'
-  test_filename = 'test_sample_run2_winfull.root'
-  test_full_filename = 'test_full_sample_run2_winfull.root'
-  log_dir = None
-  output_name = 'torch_nn_winfull_decorH'
-
   #train_filename = 'train_sample_run2.root'
   #test_filename = 'test_sample_run2.root'
   #test_full_filename = 'test_full_sample_run2.root'
@@ -710,47 +875,107 @@ if __name__ == "__main__":
   #test_filename = 'test_sample_run2_0p05.root'
   #test_full_filename = 'test_full_sample_run2_0p05.root'
 
+  #do_test = False
   do_test = True
 
-
   #batch_size = 1
+  # res_los needs resolution branch to be index=5
   # train_loss
   # 0: cross-entropy, 
-  # 1: s/sqrt(s+b), 2: Z, 3: purity
+  # 1: s/sqrt(s+b), 
+  # 2: Z 
+  # 3: purity
+  # 4: cross-entropy with weights
+  # 5: cross-entropy with weights scaled to nevents
+  # 6: cross-entropy with sig/bkg scaled to min(sig/bkg) nevents
+  # 7: 1/100*sqrt(s+b)/s
+  # 8: 1/500*sqrt(s+b*res)/s
+  # 9: cross-entropy with sig/bkg scaled + 1/3*sqrt(s+b*res)/s
   # 100: s/sqrt(s+b*res)
-  # 200: cross-entropy + disco
-  # 201: cross-entropy + disco (only on bkg)
-  # 202: cross-entropy + disco (only on bkg) + -ln(s/sqrt(s+b*res))
+  # 200: cross-entropy + 5*disco
+  # 201: cross-entropy + 5*disco (only on bkg)
+  # 202: cross-entropy + 5*disco (only on bkg) + -ln(s/sqrt(s+b*res))
   # 203: cross-entropy + 5*disco (only on bkg) + 1/1000*sqrt(s+b*res)/s
   # 204: (tune) cross-entropy + 10*disco (only on bkg) + 1/6000*sqrt(s+b*res)/s
   # 205: (tune) cross-entropy + 20*disco (only on bkg) + 1/6000*sqrt(s+b*res)/s
   # 206: (tune) cross-entropy + 40*disco (only on bkg) + 1/6000*sqrt(s+b*res)/s
-  train_loss = 206
+  # 207: (tune) cross-entropy + 5*disco (only on bkg) + 1/6000*sqrt(s+b*res)/s
+  # 300: cross-entropy with weights scaled to nevents + 5*disco (only on bkg) + 1/10000*sqrt(s+b*res)/s
+  # Compare between 0, 201, 203
+  train_loss = 9
   #log_dir = f'runs/loss{train_loss}'
   #output_name = f'nn_{log_dir}'.replace('/','_')
+
+  #nvar = 12
+  #nvar = 11
+  nvar = 10
+  #nvar = 9
 
   use_weight_in_loss = False
   use_res_in_loss = False
   use_mass_in_loss = False
+  use_full_window = True
+  set_test_train_weight = False
+  set_test_train_nevents = False
   if train_loss == 0: 
     loss_fn = nn.BCELoss()
     loss_filename = ''
+    use_full_window = False
   elif train_loss == 1: 
     loss_fn = significance_loss()
     use_weight_in_loss = True
     loss_filename = '_signi_loss'
+    use_full_window = False
   elif train_loss == 2: 
     loss_fn = z_loss()
     use_weight_in_loss = True
     loss_filename = '_z_loss'
+    use_full_window = False
   elif train_loss == 3: 
     loss_fn = purity_loss()
     use_weight_in_loss = True
     loss_filename = '_purity_loss'
+    use_full_window = False
+  elif train_loss == 4: # Note that train and test loss will be different because of event weight difference
+    loss_fn = weighted_bce_loss()
+    use_weight_in_loss = True
+    loss_filename = '_weighted_bce_loss'
+    use_full_window = False
+  elif train_loss == 5: 
+    loss_fn = weighted_scaled_bce_loss()
+    use_weight_in_loss = True
+    loss_filename = '_weighted_scaled_bce_loss'
+    use_full_window = False
+    set_test_train_weight = True
+  elif train_loss == 6: 
+    loss_fn = scaled_bce_loss()
+    use_weight_in_loss = True
+    loss_filename = '_scaled_bce_loss'
+    use_full_window = False
+    set_test_train_nevents = True
+  elif train_loss == 7: 
+    loss_fn = lin_significance_loss()
+    use_weight_in_loss = True
+    loss_filename = '_lin_signi_loss'
+    use_full_window = False
+  elif train_loss == 8: 
+    loss_fn = lin_significance_res_loss()
+    use_weight_in_loss = True
+    use_res_in_loss = True
+    use_full_window = False
+    loss_filename = '_lin_signi_res_loss'
+  elif train_loss == 9: 
+    loss_fn = scaled_bce_signi_res_loss()
+    use_weight_in_loss = True
+    use_res_in_loss = True
+    loss_filename = '_scaled_bce_loss'
+    use_full_window = False
+    set_test_train_nevents = True
   elif train_loss == 100: 
     loss_fn = significance_res_loss()
     use_weight_in_loss = True
     use_res_in_loss = True
+    use_full_window = False
     loss_filename = '_signi_res_loss'
   elif train_loss == 200: 
     loss_fn = entropy_disco_loss()
@@ -767,29 +992,59 @@ if __name__ == "__main__":
     use_weight_in_loss = True
     loss_filename = '_entropy_bkg_disco_signi_res_loss'
   elif train_loss == 203: 
-    loss_fn = entropy_bkg_disco_signi_res2_loss()
+    loss_fn = entropy_bkg_disco_signi_res2_loss() # disco 5, signi 1000
     use_mass_in_loss = True
     use_res_in_loss = True
     use_weight_in_loss = True
     loss_filename = '_entropy_bkg_disco_signi_res2_loss'
   elif train_loss == 204: 
-    loss_fn = entropy_bkg_disco_signi_res3_loss()
+    loss_fn = entropy_bkg_disco_signi_res3_loss() # disco 10, signi 6000
     use_mass_in_loss = True
     use_res_in_loss = True
     use_weight_in_loss = True
     loss_filename = '_entropy_bkg_disco_signi_res3_loss'
   elif train_loss == 205: 
-    loss_fn = entropy_bkg_disco_signi_res3_loss(disco_factor=20.)
+    loss_fn = entropy_bkg_disco_signi_res3_loss(disco_factor=20.) # signi 6000
     use_mass_in_loss = True
     use_res_in_loss = True
     use_weight_in_loss = True
     loss_filename = '_entropy_bkg_disco_signi_loss205'
   elif train_loss == 206: 
-    loss_fn = entropy_bkg_disco_signi_res3_loss(disco_factor=40.)
+    loss_fn = entropy_bkg_disco_signi_res3_loss(disco_factor=40.) # signi 6000
     use_mass_in_loss = True
     use_res_in_loss = True
     use_weight_in_loss = True
-    loss_filename = '_entropy_bkg_disco_signi_loss205'
+    loss_filename = '_entropy_bkg_disco_signi_loss206'
+  elif train_loss == 207: 
+    loss_fn = entropy_bkg_disco_signi_res3_loss(disco_factor=5., signi_divide = 2000.) 
+    use_mass_in_loss = True
+    use_res_in_loss = True
+    use_weight_in_loss = True
+    loss_filename = '_entropy_bkg_disco_signi_loss207'
+  elif train_loss == 300: 
+    #loss_fn = entropy_weight_bkg_disco_signi_res_loss(disco_factor=5., signi_divide = 1000.)
+    #loss_fn = entropy_weight_bkg_disco_signi_res_loss(disco_factor=5., signi_divide = 6000.)
+    loss_fn = entropy_weight_bkg_disco_signi_res_loss(disco_factor=5., signi_divide = 10000.)
+    use_mass_in_loss = True
+    use_res_in_loss = True
+    use_weight_in_loss = True
+    set_test_train_weight = True
+    loss_filename = '_entropy_wgt_bkg_disco_signi_res_loss'
+  test_loss_fn = copy.deepcopy(loss_fn)
+
+
+  if use_full_window:
+    train_filename = 'train_sample_run2_lumi_winfull.root'
+    test_filename = 'test_sample_run2_lumi_winfull.root'
+    test_full_filename = 'test_full_sample_run2_lumi_winfull.root'
+    log_dir = None
+    output_name = 'torch_nn_winfull_decorH'
+  else:
+    train_filename = 'train_sample_run2_lumi.root'
+    test_filename = 'test_sample_run2_lumi.root'
+    test_full_filename = 'test_full_sample_run2_lumi.root'
+    log_dir = None
+    output_name = 'torch_nn'
 
 
   if do_test == False:
@@ -798,7 +1053,7 @@ if __name__ == "__main__":
 
   print(f"Using {device} device")
   torch.manual_seed(1)
-  model = SimpleNetwork(input_size=11, hidden_size=44, output_size=1).to(device)
+  model = SimpleNetwork(input_size=nvar, hidden_size=nvar*4, output_size=1).to(device)
   min_max_array = []
   if do_fine_tune == 1:
     load_tmva_model('dataset/weights/TMVAClassification_DNN.weights.xml', model, min_max_array)
@@ -806,23 +1061,76 @@ if __name__ == "__main__":
     state_dict = torch.load(model_filename)
     model.load_state_dict(state_dict)
 
-  feature_names = ['photon_mva', 'min_dR', 'pt_mass', 'cosTheta', 'costheta', 
-                   #'photon_res', 
-                   'llg_mass_err',
-                   'photon_rapidity', 'l1_rapidity', 'l2_rapidity',
-                   'llg_flavor', 'gamma_pt']
-  normalize_max_min = [[-0.57861328125,0.98583984375],
-                      [0.400207489729,3.32512640953],
-                      [0.000612989999354,4.14180803299],
-                      [-0.999573588371,0.998835206032],
-                      [-0.987939178944,0.983025610447],
-                      #[0.00963300466537,1.51448833942], # photon_res
-                      [0.53313,16.254], # llg_mass_err
-                      [-2.49267578125,2.4921875],
-                      [-2.49072265625,2.4814453125],
-                      [-2.49072265625,2.50830078125],
-                      [1., 2.],
-                      [15.015657, 295.22623]]
+  if nvar == 12:
+    feature_names = ['photon_mva', 'min_dR', 'pt_mass', 'cosTheta', 'costheta', 
+                     #'photon_res', 
+                     'llg_mass_err',
+                     'photon_rapidity', 'l1_rapidity', 'l2_rapidity',
+                     'llg_flavor', 'max_dR', 'llg_ptt']
+    normalize_max_min = [[-0.57861328125,0.98583984375],
+                        [0.400207489729,3.32512640953],
+                        [0.000612989999354,4.14180803299],
+                        [-0.999573588371,0.998835206032],
+                        [-0.987939178944,0.983025610447],
+                        #[0.00963300466537,1.51448833942], # photon_res
+                        [0.53313,16.254], # llg_mass_err
+                        [-2.49267578125,2.4921875],
+                        [-2.49072265625,2.4814453125],
+                        [-2.49072265625,2.50830078125],
+                        [1., 2.],
+                        [0.41682249, 5.1650324],
+                        [0., 396.69781],
+                        ]
+  #if nvar == 11:
+  #  feature_names = ['photon_mva', 'min_dR', 'pt_mass', 'cosTheta', 'costheta', 
+  #                   #'photon_res', 
+  #                   'llg_mass_err',
+  #                   'photon_rapidity', 'l1_rapidity', 'l2_rapidity',
+  #                   'llg_flavor', 'gamma_pt']
+  #  normalize_max_min = [[-0.57861328125,0.98583984375],
+  #                      [0.400207489729,3.32512640953],
+  #                      [0.000612989999354,4.14180803299],
+  #                      [-0.999573588371,0.998835206032],
+  #                      [-0.987939178944,0.983025610447],
+  #                      #[0.00963300466537,1.51448833942], # photon_res
+  #                      [0.53313,16.254], # llg_mass_err
+  #                      [-2.49267578125,2.4921875],
+  #                      [-2.49072265625,2.4814453125],
+  #                      [-2.49072265625,2.50830078125],
+  #                      [1., 2.],
+  #                      [15.015657, 295.22623]]
+  elif nvar == 10:
+    feature_names = ['photon_mva', 'min_dR', 'pt_mass', 'cosTheta', 'costheta', 
+                     #'photon_res', 
+                     'llg_mass_err',
+                     'photon_rapidity', 'l1_rapidity', 'l2_rapidity',
+                     'llg_flavor']
+    normalize_max_min = [[-0.57861328125,0.98583984375],
+                        [0.400207489729,3.32512640953],
+                        [0.000612989999354,4.14180803299],
+                        [-0.999573588371,0.998835206032],
+                        [-0.987939178944,0.983025610447],
+                        #[0.00963300466537,1.51448833942], # photon_res
+                        [0.53313,16.254], # llg_mass_err
+                        [-2.49267578125,2.4921875],
+                        [-2.49072265625,2.4814453125],
+                        [-2.49072265625,2.50830078125],
+                        [1., 2.],
+                        ]
+  elif nvar == 9:
+    feature_names = ['photon_mva', 'min_dR', 'pt_mass', 'cosTheta', 'costheta', 
+                     'photon_res', 
+                     'photon_rapidity', 'l1_rapidity', 'l2_rapidity',]
+    normalize_max_min = [[-0.57861328125,0.98583984375],
+                        [0.400207489729,3.32512640953],
+                        [0.000612989999354,4.14180803299],
+                        [-0.999573588371,0.998835206032],
+                        [-0.987939178944,0.983025610447],
+                        [0.00963300466537,1.51448833942], # photon_res
+                        [-2.49267578125,2.4921875],
+                        [-2.49072265625,2.4814453125],
+                        [-2.49072265625,2.50830078125],
+                        ]
 
   #model.eval()
   #with torch.no_grad():
@@ -842,7 +1150,7 @@ if __name__ == "__main__":
                             features = feature_names,
                             normalize = normalize_max_min,
                             cut = '1',
-                            spectators = ['llg_mass', 'w_lumi'],
+                            spectators = ['llg_mass', 'w_lumiXyear'],
                             class_branch = ['classID'])
   print(f'train entries: {len(train_dataset)}')
 
@@ -859,7 +1167,7 @@ if __name__ == "__main__":
                             features = feature_names,
                             normalize = normalize_max_min,
                             cut = '1',
-                            spectators = ['llg_mass', 'w_lumi'],
+                            spectators = ['llg_mass', 'w_lumiXyear'],
                             class_branch = ['classID'], 
                             entry_stop = len(train_dataset)
                             )
@@ -877,12 +1185,49 @@ if __name__ == "__main__":
                             features = feature_names,
                             normalize = normalize_max_min,
                             cut = '1',
-                            spectators = ['llg_mass', 'w_lumi'],
+                            spectators = ['llg_mass', 'w_lumiXyear'],
                             class_branch = ['classID'])
   print(f'eval entries: {len(eval_dataset)}')
+
+  #if train_loss == 5 or train_loss == 300:
+  if set_test_train_weight:
+    loss_fn.set_weight_scale(train_dataset.spec_array[:,1])
+    test_loss_fn.set_weight_scale(test_dataset.spec_array[:,1])
+  if set_test_train_nevents:
+    with torch.no_grad():
+      signal_nevents = np.sum(train_dataset.label_array[:,1])
+      bkg_nevents = np.sum(train_dataset.label_array[:,0])
+    loss_fn.set_scale(signal_nevents, bkg_nevents)
+    with torch.no_grad():
+      signal_nevents = np.sum(train_dataset.label_array[:,1])
+      bkg_nevents = np.sum(train_dataset.label_array[:,0])
+    test_loss_fn.set_scale(signal_nevents, bkg_nevents)
+    #print(f'weight scale: {loss_fn.weight_scale} {test_loss_fn.weight_scale}')
+
   
   train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
   test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+  #with torch.no_grad():
+  #  model.eval()
+  #  nBatches = len(train_dataloader)
+  #  loss = 0.
+  #  for batch, (feature, label, spec) in enumerate(train_dataloader):
+  #    X, y = feature.to(device), torch.max(label,1)[1].to(device)
+  #    pred = model(X)
+  #    loss += calculate_loss(X, y, pred, spec, loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss).item()
+  #  print(f'train loss: {loss}')
+  #  loss /= nBatches
+  #  print(f'  train loss: {loss}')
+  #  loss = 0.
+  #  nBatches = len(test_dataloader)
+  #  for batch, (feature, label, spec) in enumerate(test_dataloader):
+  #    X, y = feature.to(device), torch.max(label,1)[1].to(device)
+  #    pred = model(X)
+  #    loss += calculate_loss(X, y, pred, spec, loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss).item()
+  #  print(f'test loss: {loss}')
+  #  loss /= nBatches
+  #  print(f'  test loss: {loss}')
 
   if do_fine_tune:
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
@@ -898,13 +1243,14 @@ if __name__ == "__main__":
     if iEpoch != 0 or do_test:
       print(f"Epoch {iEpoch+1}\n-------------------------------")
       train(train_dataloader, model, loss_fn, optimizer, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
-    if iEpoch % eval_epoch and not do_test == 0:
+    #if iEpoch % eval_epoch ==0 and not do_test:
+    if iEpoch % eval_epoch ==0:
       # Evaluate
       results = {'train': {}, 'test': {}}
-      filename = 'trash/evaluate.root'
+      filename = f'trash/evaluate_trainloss{train_loss}_nvar{nvar}.root'
       # Returns loss, sample arrays
       results['train'] = evaluate_sample(train_dataloader, device, model, loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
-      results['test'] = evaluate_sample(test_dataloader, device, model, loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
+      results['test'] = evaluate_sample(test_dataloader, device, model, test_loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
       # Create evaluation root file
       with uproot.recreate(filename) as root_file:
         root_file['train_tree'] = {'x': results['train']['x'], 'y': results['train']['y'], 'yhat': results['train']['yhat'], 'mass': results['train']['mass'], 'weight': results['train']['weight']}
@@ -912,35 +1258,35 @@ if __name__ == "__main__":
       mva_dict = [evaluate.load_mva_dict(filename, 'mva')]
       # Evaluate train
       #train_significances, train_purities = evaluate.evaluate_significance_with_resolution(mva_dict, draw=False, tree_type='train_tree')
-      train_significances, train_purities = evaluate.evaluate_significance(mva_dict, draw=False, tree_type='train_tree')
-      train_significances_with_res, train_purities_with_res = evaluate.evaluate_significance_with_resolution(mva_dict, draw=False, tree_type='train_tree')
+      #train_significances, train_purities = evaluate.evaluate_significance(mva_dict, draw=False, tree_type='train_tree')
+      train_significances_with_res, train_purities_with_res = evaluate.evaluate_significance_bins_with_resolution(mva_dict, draw=False, tree_type='train_tree')
       train_std_divs = evaluate.evaluate_correlation(mva_dict, draw=False, tree_type='train_tree')
-      results['train']['significance'] = train_significances[0]
-      results['train']['purity'] = train_purities[0]
+      #results['train']['significance'] = train_significances[0]
+      #results['train']['purity'] = train_purities[0]
       results['train']['significance_res'] = train_significances_with_res[0]
       results['train']['purity_res'] = train_purities_with_res[0]
       results['train']['observable_std_div'] = train_std_divs[0]
       # Evaluate test
       #test_significances, test_purities = evaluate.evaluate_significance_with_resolution(mva_dict, draw=False, tree_type='test_tree')
       test_significances, test_purities = evaluate.evaluate_significance(mva_dict, draw=False, tree_type='test_tree')
-      test_significances_with_res, test_purities_with_res = evaluate.evaluate_significance_with_resolution(mva_dict, draw=False, tree_type='test_tree')
+      test_significances_with_res, test_purities_with_res = evaluate.evaluate_significance_bins_with_resolution(mva_dict, draw=False, tree_type='test_tree')
       test_std_divs = evaluate.evaluate_correlation(mva_dict, draw=False, tree_type='test_tree')
-      results['test']['significance'] = test_significances[0]
-      results['test']['purity'] = test_purities[0]
+      #results['test']['significance'] = test_significances[0]
+      #results['test']['purity'] = test_purities[0]
       results['test']['significance_res'] = test_significances_with_res[0]
       results['test']['purity_res'] = test_purities_with_res[0]
       results['test']['observable_std_div'] = test_std_divs[0]
       # Log evaluation results
       print(f"loss: train: {results['train']['loss']:.6f}, test: {results['test']['loss']:.6f}")
-      print(f"significance: train: {results['train']['significance']:.6f}, test: {results['test']['significance']:.6f}")
-      print(f"purity: train: {results['train']['purity']:.6f}, test: {results['test']['purity']:.6f}")
+      #print(f"significance: train: {results['train']['significance']:.6f}, test: {results['test']['significance']:.6f}")
+      #print(f"purity: train: {results['train']['purity']:.6f}, test: {results['test']['purity']:.6f}")
       print(f"significance with res.: train: {results['train']['significance_res']:.6f}, test: {results['test']['significance_res']:.6f}")
       print(f"purity with res.: train: {results['train']['purity_res']:.6f}, test: {results['test']['purity_res']:.6f}")
       print(f"observable std div: train: {results['train']['observable_std_div']:.6f}, test: {results['test']['observable_std_div']:.6f}")
       if do_test == False:
         writer.add_scalars('Loss', {'train': results['train']['loss'], 'test': results['test']['loss']}, iEpoch)
-        writer.add_scalars('Significance', {'train': results['train']['significance'], 'test': results['test']['significance']}, iEpoch)
-        writer.add_scalars('Purity', {'train': results['train']['purity'], 'test': results['test']['purity']}, iEpoch)
+        #writer.add_scalars('Significance', {'train': results['train']['significance'], 'test': results['test']['significance']}, iEpoch)
+        #writer.add_scalars('Purity', {'train': results['train']['purity'], 'test': results['test']['purity']}, iEpoch)
         writer.add_scalars('Significance with res.', {'train': results['train']['significance_res'], 'test': results['test']['significance_res']}, iEpoch)
         writer.add_scalars('Purity with res.', {'train': results['train']['purity_res'], 'test': results['test']['purity_res']}, iEpoch)
         writer.add_scalars('Observable std. div.', {'train': results['train']['observable_std_div'], 'test': results['test']['observable_std_div']}, iEpoch)

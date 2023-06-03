@@ -24,6 +24,9 @@ def write_ntuples(filenames, cuts, out_name, defines=[], tree_name='tree', branc
   df = ROOT.RDataFrame('tree',filenames_vec)
   for define in defines:
     df = df.Define(define[0],define[1])
+  df = df.DefinePerSample("luminosity", "get_luminosity(rdfslot_, rdfsampleinfo_)")
+  df = df.DefinePerSample("year", "get_year(rdfslot_, rdfsampleinfo_)")
+  df = df.Define("w_lumiXyear", "w_lumi * luminosity")
   for cut in cuts:
     df = df.Filter(cut)
   if (branches == ()):
@@ -115,6 +118,25 @@ float get_llg_ptt(RVec<float> photon_pt, RVec<float> photon_eta, RVec<float> pho
   gamma.SetZ(0); higgs.SetZ(0); zboson.SetZ(0);
   return higgs.Cross((zboson-gamma).Unit()).Mag();
 }
+
+float get_luminosity(unsigned int slot, const ROOT::RDF::RSampleInfo &id) {
+  float luminosity = 0;
+  if (id.Contains("2016APV/mc")) luminosity = 16.8;
+  else if (id.Contains("2016/mc"))  luminosity = 19.5;
+  else if (id.Contains("2017/mc")) luminosity = 41.48;
+  else if (id.Contains("2018/mc")) luminosity = 59.83;
+  //cout<<id.AsString()<<" "<<luminosity<<endl;
+  return luminosity;
+}
+
+int get_year(unsigned int slot, const ROOT::RDF::RSampleInfo &id) {
+  int year = 0;
+  if (id.Contains("2016APV/mc")) year = 2016;
+  else if (id.Contains("2016/mc"))  year = 2016;
+  else if (id.Contains("2017/mc")) year = 2017;
+  else if (id.Contains("2018/mc")) year = 2018;
+  return year;
+}
 """)
 
 if __name__=='__main__':
@@ -123,7 +145,7 @@ if __name__=='__main__':
   #TODO: move generic function to /lib/
   cuts = ['HLT_Ele23_Ele12_CaloIdL_TrackIdL_IsoVL||HLT_Ele23_Ele12_CaloIdL_TrackIdL_IsoVL_DZ||HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ',
       'll_m.size()>0&&llphoton_m.size()>0',
-      'stitch_dy||(type%1000!=6)',
+      'stitch_dy||(type/1000!=6)',
       '(ll_m[0]>50)&&(photon_pt[0]/llphoton_m[0]>=15.0/110.0)&&((llphoton_m[0]+ll_m[0])>185)&&(photon_drmin[0]>0.4)',
       '(ll_lepid[0]==11&&el_pt[ll_i1[0]]>25&&el_pt[ll_i2[0]]>15)||(ll_lepid[0]==13&&mu_pt[ll_i1[0]]>20&&mu_pt[ll_i2[0]]>10)',
       #'llphoton_m[0]>120&&llphoton_m[0]<130',
@@ -139,6 +161,7 @@ if __name__=='__main__':
              ('costheta','llphoton_costheta[0]'),
              ('phi','llphoton_phi[0]'),
              ('photon_res','photon_pterr[0]/photon_pt[0]'),
+             ('photon_res_e','photon_pterr[0]/(photon_pt[0]*cosh(photon_eta[0]))'),
              ('photon_rapidity','photon_eta[0]'),
              ('l1_rapidity','get_l1_rapidity(el_pt,el_eta,mu_pt,mu_eta,ll_lepid,ll_i1,ll_i2)'),
              ('l2_rapidity','get_l2_rapidity(el_pt,el_eta,mu_pt,mu_eta,ll_lepid,ll_i1,ll_i2)'),
@@ -159,8 +182,9 @@ if __name__=='__main__':
              ('gamma_phi', 'photon_phi[0]'),
              ]
   branches = ('photon_mva','min_dR','max_dR','pt_mass','cosTheta','costheta',
-      'phi','photon_res','photon_rapidity','l1_rapidity','l2_rapidity','decorr_photon_pt','photon_pt_mass','w_lumi', 'llg_mass', 'llg_mass_err', 'llg_flavor', 'gamma_pt',
-      'llg_eta', 'llg_phi', 'llg_ptt', 'z_eta', 'z_phi', 'l1_phi', 'l2_phi', 'gamma_eta', 'gamma_phi')
+      'phi','photon_res','photon_res_e', 'photon_rapidity','l1_rapidity','l2_rapidity','decorr_photon_pt','photon_pt_mass','w_lumi', 'llg_mass', 'llg_mass_err', 'llg_flavor', 'gamma_pt',
+      'llg_eta', 'llg_phi', 'llg_ptt', 'z_eta', 'z_phi', 'l1_phi', 'l2_phi', 'gamma_eta', 'gamma_phi', 
+      'year', 'luminosity', 'w_lumiXyear')
   #define drmax, pt_mass, first index
   #make n-tuples
   #signal_files = '/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*GluGluHToZG*.root'
@@ -173,23 +197,25 @@ if __name__=='__main__':
     signal_file = f'/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/{year}/mc/skim_llg/*GluGluHToZG*M-125*.root'
     signal_files.append(signal_file)
     bkg_1_file = f'/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/{year}/mc/skim_llg/*DYJetsToLL_M-50*madgraphMLM*.root'
+    #bkg_1_file = f'/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/{year}/mc/skim_llg/*DYJetsToLL_M-50*amcatnloFXFX*.root'
     bkg_2_file = f'/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/{year}/mc/skim_llg/*ZGToLLG_01J_5f_TuneCP5*.root'
     bkg_files.append(bkg_1_file)
     bkg_files.append(bkg_2_file)
   write_ntuples(signal_files,
       cuts,
-      'ntuples/train_decorr_sig_run2.root',
+      'ntuples/train_decorr_sig_run2_lumi.root',
       #'ntuples/train_decorr_sig.root',
       defines,
       'tree',
       branches)
   write_ntuples(bkg_files,
       cuts,
-      'ntuples/train_decorr_bak_run2.root',
+      'ntuples/train_decorr_bak_run2_lumi.root',
       #'ntuples/train_decorr_bak.root',
       defines,
       'tree',
       branches)
+  # Combine years
 
   #rootutils.plot_variables('ntuples/train_decorr_sig_run2.root', 'tree', branches, out_folder = 'plots')
   #rootutils.plot_variables('ntuples/train_decorr_bak_run2.root', 'tree', branches, out_folder = 'plots')

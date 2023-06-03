@@ -96,14 +96,7 @@ void parse_xml(string tmva_weights, vector<string> & tmva_variables, vector<stri
 
 // Run: root use_tmva.C -q
 using namespace TMVA;
-void use_tmva() {
-
-  //// evaluate_mva = 1 is for bdt, evaluate_mva = 2 is for nn, 
-  // evaluate_mva = 3 is for raw bdt, 
-  // evaluate_mva = 4 is for run2 bdt
-  // evaluate_mva = 5 is for reduced bdt
-  // evaluate_mva = 6 is for var12 bdt
-  int evaluate_mva = 6;
+void use_tmva_kfold(string input_file, string input_tree, string mva_branch, string tmva_weights, string output_file) {
 
   // Load bdt tmva
   TMVA::Reader *tmva_reader = new TMVA::Reader( "!Color:!Silent" );
@@ -112,38 +105,38 @@ void use_tmva() {
   //string input_train_tree = "train_tree";
   //string input_test_root = "test_full_sample_run2.root";
   //string input_test_root = "test_full_sample_run2_winfull.root";
-  string input_test_root = "test_full_sample_run2_lumi.root";
-  string input_test_tree = "test_tree";
+
+  //string input_test_root = "test_full_sample_run2_lumi.root";
+  //string input_test_tree = "test_tree";
+
+  string input_test_root = input_file;
+  string input_test_tree = input_tree;
   string label = "classID";
 
-  string output_root;
-  string tmva_weights;
-  string tmva_output;
-  if (evaluate_mva == 1) {
-    output_root = "tmva_evaluate_bdt_run2.root";
-    tmva_weights = "dataset/weights/TMVAClassification_BDT.weights.xml";
-    tmva_output = "BDT";
-  } else if (evaluate_mva == 2) {
-    output_root = "tmva_evaluate_nn.root";
-    tmva_weights = "dataset/weights/TMVAClassification_DNN.weights.xml";
-    tmva_output = "DNN";
-  } else if (evaluate_mva == 3) {
-    output_root = "tmva_evaluate_raw_bdt.root";
-    tmva_weights = "raw_bdt/weights/TMVAClassification_BDT.weights.xml";
-    tmva_output = "BDT";
-  } else if (evaluate_mva == 4) {
-    output_root = "tmva_evaluate_run2_bdt.root";
-    tmva_weights = "run2_bdt/weights/TMVAClassification_BDT.weights.xml";
-    tmva_output = "BDT";
-  } else if (evaluate_mva == 5) {
-    output_root = "tmva_evaluate_reduced_bdt.root";
-    tmva_weights = "reduced_bdt/weights/TMVAClassification_BDT.weights.xml";
-    tmva_output = "BDT";
-  } else if (evaluate_mva == 6) {
-    output_root = "tmva_evaluate_var12_bdt.root";
-    tmva_weights = "var12_bdt/weights/TMVAClassification_BDT.weights.xml";
-    tmva_output = "BDT";
-  }
+  string output_root = output_file;
+  //string tmva_weights;
+  string tmva_output = mva_branch;
+  //if (evaluate_mva == 1) {
+  //  output_root = "tmva_evaluate_bdt_run2.root";
+  //  tmva_weights = "dataset/weights/TMVAClassification_BDT.weights.xml";
+  //  tmva_output = "BDT";
+  //} else if (evaluate_mva == 2) {
+  //  output_root = "tmva_evaluate_nn.root";
+  //  tmva_weights = "dataset/weights/TMVAClassification_DNN.weights.xml";
+  //  tmva_output = "DNN";
+  //} else if (evaluate_mva == 3) {
+  //  output_root = "tmva_evaluate_raw_bdt.root";
+  //  tmva_weights = "raw_bdt/weights/TMVAClassification_BDT.weights.xml";
+  //  tmva_output = "BDT";
+  //} else if (evaluate_mva == 4) {
+  //  output_root = "tmva_evaluate_run2_bdt.root";
+  //  tmva_weights = "run2_bdt/weights/TMVAClassification_BDT.weights.xml";
+  //  tmva_output = "BDT";
+  //} else if (evaluate_mva == 5) {
+  //  output_root = "tmva_evaluate_reduced_bdt.root";
+  //  tmva_weights = "reduced_bdt/weights/TMVAClassification_BDT.weights.xml";
+  //  tmva_output = "BDT";
+  //}
 
   //// For BDT
   //string output_root = "tmva_evaluate_bdt.root";

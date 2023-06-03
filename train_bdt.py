@@ -6,19 +6,31 @@ import sklearn.ensemble
 import xgboost
 from RootDataset import RootDataset
 import uproot
+import numpy as np
 
 if __name__ == '__main__':
+
+  decorr = True
+
   feature_names = ['photon_mva', 'min_dR', 'pt_mass', 'cosTheta', 'costheta', 
                    'photon_res', 
                    #'llg_mass_err',
                    'photon_rapidity', 'l1_rapidity', 'l2_rapidity',
                    #'llg_flavor',
                    ]
-  train_filename = 'train_sample_run2.root'
-  test_filename = 'test_sample_run2.root'
-  test_full_filename = 'test_full_sample_run2.root'
-  gbdt_filename = 'ntuples_mva/gbdt_run2.root'
-  xgbt_filename = 'ntuples_mva/xgbdt_run2.root'
+
+  if decorr:
+    train_filename = 'train_sample_run2_lumi_winfull.root'
+    test_filename = 'test_sample_run2_lumi_winfull.root'
+    test_full_filename = 'test_full_sample_run2_lumi_winfull.root'
+    gbdt_filename = 'ntuples_mva/gbdt_run2_decorr.root'
+    xgbt_filename = 'ntuples_mva/xgbdt_run2_decorr.root'
+  else:
+    train_filename = 'train_sample_run2_lumi.root'
+    test_filename = 'test_sample_run2_lumi.root'
+    test_full_filename = 'test_full_sample_run2_lumi.root'
+    gbdt_filename = 'ntuples_mva/gbdt_run2.root'
+    xgbt_filename = 'ntuples_mva/xgbdt_run2.root'
 
   train_dataset = RootDataset(root_filename= train_filename,
                             tree_name = "train_tree",
@@ -26,7 +38,8 @@ if __name__ == '__main__':
                             #normalize = normalize_max_min,
                             cut = '1',
                             #spectators = ['llg_mass', 'w_lumi'],
-                            spectators = ['llg_mass', 'w_llg_mass', 'w_lumi'],
+                            #spectators = ['llg_mass', 'w_llg_mass', 'w_lumiXyear', 'classID'],
+                            spectators = ['llg_mass', 'w_lumiXyearXshape', 'w_lumiXyear', 'classID'],
                             class_branch = ['classID'])
   print(f'train entries: {len(train_dataset)}')
 
@@ -35,7 +48,19 @@ if __name__ == '__main__':
   train_label_array = train_dataset.label_array[:,1]
   train_spec_array = train_dataset.spec_array
   train_mass_array = train_dataset.spec_array[:,0]
-  train_weight_array = train_dataset.spec_array[:,1]
+  if decorr: 
+    train_weight_array = train_dataset.spec_array[:,1]
+  else: 
+    nbkg = np.count_nonzero(train_dataset.spec_array[:,3]==0)
+    nsig = np.count_nonzero(train_dataset.spec_array[:,3]==1)
+    nsig_nbkg = nsig * 1./ nbkg
+    ## weight signal and bkg equally
+    #train_weight_array = np.array(train_dataset.spec_array[:,3])
+    #train_weight_array[train_weight_array == 0] = nsig_nbkg
+    ##print(f'nsig: {nsig} nbkg: {nbkg}. Reweight bkg by {nsig_nbkg} sum: {np.sum(train_weight_array)}')
+    # weight according to weight
+    train_weight_array = np.array(train_dataset.spec_array[:,2])
+    # Could try to make signal and bkg have same number of events.
   train_w_lumi_array = train_dataset.spec_array[:,2]
   nlabels = train_hot_label_array.shape[1]
   # Set negative weights to 0
@@ -57,7 +82,7 @@ if __name__ == '__main__':
                             features = feature_names,
                             #normalize = normalize_max_min,
                             cut = '1',
-                            spectators = ['llg_mass', 'w_lumi'],
+                            spectators = ['llg_mass', 'w_lumiXyear'],
                             class_branch = ['classID'])
   print(f'test entries: {len(test_dataset)}')
   test_feature_array = test_dataset.feature_array
@@ -72,7 +97,7 @@ if __name__ == '__main__':
                             tree_name = "test_tree",
                             features = feature_names,
                             cut = '1',
-                            spectators = ['llg_mass', 'w_lumi'],
+                            spectators = ['llg_mass', 'w_lumiXyear'],
                             class_branch = ['classID'])
   print(f'eval entries: {len(eval_dataset)}')
   eval_feature_array = eval_dataset.feature_array
@@ -95,7 +120,7 @@ if __name__ == '__main__':
   # Save tree
   gbdt_root_file = uproot.recreate(gbdt_filename)
   gbdt_root_file["test_tree"] = {'x': test_feature_array, 'y': test_label_array, 'yhat': test_predict_array_gbdt, 'mass': test_mass_array, 'weight': test_weight_array}
-  gbdt_root_file["train_tree"] = {'x': train_feature_array, 'y': train_label_array, 'yhat': train_predict_array_gbdt, 'mass': train_mass_array, 'weight': train_w_lumi_array}
+  gbdt_root_file["train_tree"] = {'x': train_feature_array, 'y': train_label_array, 'yhat': train_predict_array_gbdt, 'mass': train_mass_array, 'weight': train_weight_array}
   gbdt_root_file["test_full_tree"] = {'x': eval_feature_array, 'y': eval_label_array, 'yhat': eval_predict_array_gbdt, 'mass': eval_mass_array, 'weight': eval_weight_array}
   print('Wrote bdt results to '+gbdt_filename)
 

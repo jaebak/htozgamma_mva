@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+from ROOT import TMVA, TFile, TTree, TCut, TChain, TH1F, TString, TCanvas
+TMVA.Tools.Instance()
+TMVA.PyMethodBase.PyInitialize()
+import math
+import numpy as np
+import array
+import argparse
+import os
+import sys
+import time
+
+def train_bdt(folder, train_filename, test_filename, tmva_filename):
+  output = TFile.Open(tmva_filename, 'RECREATE')
+  factory = TMVA.Factory('TMVAClassification', output,
+                         '!V:ROC:!Correlations:!Silent:Color:'
+                         '!DrawProgressBar:AnalysisType=Classification')
+  dataloader = TMVA.DataLoader(folder)
+  dataloader.AddVariable("photon_mva",'F')
+  dataloader.AddVariable("llg_ptt",'F')
+  dataloader.AddVariable("llg_eta",'F')
+  dataloader.AddVariable("llg_phi",'F')
+  dataloader.AddVariable("z_eta",'F')
+  dataloader.AddVariable("z_phi",'F')
+  dataloader.AddVariable("l1_rapidity",'F')
+  dataloader.AddVariable("l1_phi",'F')
+  dataloader.AddVariable("l2_rapidity",'F')
+  dataloader.AddVariable("l2_phi",'F')
+  dataloader.AddVariable("gamma_eta",'F')
+  dataloader.AddVariable("gamma_phi",'F')
+  dataloader.SetBackgroundWeightExpression("w_lumiXyear")
+  dataloader.SetSignalWeightExpression("w_lumiXyear")
+  dataloader.AddSpectator("llg_mass", 'F')
+  dataloader.AddSpectator("w_lumiXyear", 'F')
+
+  # Add data.
+  train_chain = TChain('train_tree')
+  train_chain.Add(train_filename)
+  test_chain = TChain('test_tree')
+  test_chain.Add(test_filename)
+  dataloader.AddTree(train_chain, 'Background', 1., 'classID==0', TMVA.Types.kTraining)
+  dataloader.AddTree(train_chain, 'Signal', 1., 'classID==1', TMVA.Types.kTraining)
+  dataloader.AddTree(test_chain, 'Background', 1., 'classID==0', TMVA.Types.kTesting)
+  dataloader.AddTree(test_chain, 'Signal', 1., 'classID==1', TMVA.Types.kTesting)
+  cut_s = TCut('llg_mass>120 && llg_mass < 130');
+  cut_b = TCut('llg_mass>120 && llg_mass < 130');
+  dataloader.PrepareTrainingAndTestTree(cut_s,cut_b,f"NormMode=NumEvents:ScaleWithPreselEff:!V");
+
+  factory.BookMethod(dataloader,TMVA.Types.kBDT,"BDT","!H:!V:NTrees=850:MinNodeSize=2.5%:MaxDepth=3:BoostType=AdaBoost:AdaBoostBeta=0.5:UseBaggedBoost:BaggedSampleFraction=0.5:SeparationType=GiniIndex:nCuts=20");
+  factory.TrainAllMethods();
+  factory.TestAllMethods();
+  factory.EvaluateAllMethods();
+  output.Close()
+
+if __name__ == "__main__":
+  # Make options for kfold
+  parser = argparse.ArgumentParser(description='Train tmva')
+  parser.add_argument('-s','--kfold_seed', required=False, help='kfold seed for training', default=None)
+  args = parser.parse_args()
+
+  train_filename = "train_sample_run2_lumi.root"
+  test_filename = "test_sample_run2_lumi.root"
+  output_folder = 'ntuples_mva' # nominal output
+  kfold_folder = 'ntuples_kfold'
+  output_base_filename = "raw_bdt"
+  bdt_name = "raw_bdt"
+
+  start_time = time.time()
+  if not args.kfold_seed:
+    train_bdt(folder= bdt_name, 
+              train_filename= train_filename, 
+              test_filename=test_filename, 
+              tmva_filename=f'{output_folder}/{output_base_filename}.root')
+  else:
+    # Assumes split_kfold.py puts train and test tree in file called train_sample_run2_lumi_sX.root
+    base_filename = train_filename 
+    input_filename = f'{kfold_folder}/{os.path.splitext(base_filename)[0]}_s{args.kfold_seed}{os.path.splitext(base_filename)[1]}'
+    # Check if input file exists
+    if not os.path.isfile(input_filename):
+      print(f'Error: file does not exist. {input_filename}')
+      sys.exit()
+
+    output_filename = f'{kfold_folder}/{output_base_filename}_s{args.kfold_seed}.root'
+    bdt_model_folder = f"{bdt_name}_s{args.kfold_seed}"
+    #print(output_filename)
+    print(f'bdt_model_folder: {bdt_model_folder}')
+    print(f'input_filename: {input_filename}')
+    print(f'output_filename: {output_filename}')
+    train_bdt(folder=bdt_model_folder, 
+              train_filename=input_filename, 
+              test_filename=input_filename, 
+              tmva_filename=output_filename)
+     
+    # Run trained bdt over full set
+    eval_output_filename = f'{kfold_folder}/eval_{output_base_filename}_s{args.kfold_seed}.root'
+    command = f'root -q \'use_tmva_kfold.C("{input_filename}", "test_full_tree", "BDT", "{bdt_model_folder}/weights/TMVAClassification_BDT.weights.xml", "{eval_output_filename}")\''
+    print(command)
+    os.system(command)
+
+  elapsed_time = time.time() - start_time
+  print(f'Training time: {elapsed_time}')
+    
+
+  #TMVA::TMVAGui("ntuples_mva/TMVA_bdt.root")

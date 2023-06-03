@@ -8,24 +8,27 @@ if __name__ == '__main__':
 
   print('Make weights that converts input distribution into target distribution')
   #target_filename = 'ntuples/train_decorr_sig.root'
-  target_filename = 'ntuples/train_decorr_sig_run2.root'
+  #target_filename = 'ntuples/train_decorr_sig_run2.root'
+  target_filename = 'ntuples/train_decorr_sig_run2_lumi.root'
   target_tree = 'tree'
   target_branch = 'llg_mass'
-  target_weight = 'w_lumi'
+  target_weight = 'w_lumiXyear'
   target_cut = '1'
 
   #input_filename = 'ntuples/train_decorr_bak.root'
-  input_filename = 'ntuples/train_decorr_bak_run2.root'
+  #input_filename = 'ntuples/train_decorr_bak_run2.root'
+  input_filename = 'ntuples/train_decorr_bak_run2_lumi.root'
   input_tree = 'tree'
   input_branch = 'llg_mass'
-  input_weight = 'w_lumi'
+  input_weight = 'w_lumiXyear'
   input_cut = '1'
 
   nbins = 160
-  output_weight_filename = 'shape_wgt.root'
+  output_weight_filename = 'shape_wgt_run2_lumi.root'
   #output_filename = 'ntuples/train_decorr_bak_shapewgt.root'
-  output_filename = 'ntuples/train_decorr_bak_shapewgt_run2.root'
-  output_weight = 'weight'
+  #output_filename = 'ntuples/train_decorr_bak_shapewgt_run2.root'
+  output_filename = 'ntuples/train_decorr_bak_shapewgt_run2_lumi.root'
+  output_weight = 'w_lumiXyearXshape'
 
   # Open files
   target_chain = ROOT.TChain(target_tree)
@@ -71,7 +74,7 @@ if __name__ == '__main__':
 
   # Apply weights to input_file
   defines = [('w_llg_mass','get_shape_weight(llg_mass)'),
-             (output_weight, 'w_lumi*w_llg_mass')]
+             (output_weight, f'{input_weight}*w_llg_mass')]
   cuts = ['1',]
   branches = ()
 

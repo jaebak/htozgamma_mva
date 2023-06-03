@@ -6,13 +6,16 @@ if __name__ == '__main__':
   ROOT.EnableImplicitMT()
 
   #input_filename = 'ntuples/train_decorr_sig.root'
-  input_filename = 'ntuples/train_decorr_sig_run2.root'
+  #input_filename = 'ntuples/train_decorr_sig_run2.root'
+  input_filename = 'ntuples/train_decorr_sig_run2_lumi.root'
   input_tree = 'tree'
   #output_filename = 'ntuples/train_decorr_sig_shapewgt.root'
-  output_filename = 'ntuples/train_decorr_sig_shapewgt_run2.root'
+  #output_filename = 'ntuples/train_decorr_sig_shapewgt_run2.root'
+  output_filename = 'ntuples/train_decorr_sig_shapewgt_run2_lumi.root'
 
   defines = [('w_llg_mass','1.'),
-             ('weight', 'w_lumi*w_llg_mass')]
+             #('weight', 'w_lumi*w_llg_mass')]
+             ('w_lumiXyearXshape', 'w_lumiXyear*w_llg_mass')]
   cuts = ['1',]
   branches = ()
 

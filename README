@@ -17,8 +17,9 @@ pip3 install tensorboard
 2. make_same_shape_using_weights.py for background
    make_matching_branch_signal.py for signal
 
-2. Run split_ntuples.py: Makes ntuples for training and testing.
+3. Run split_ntuples.py: Makes ntuples for training and testing. 
    Since it is hard to control training/test sample size in TMVA, make samples in split_ntuples.
+   Run it two times. One time for full window. One time for higgs mass window.
   Input: 
   - Flat ntuples for bkg
   - Flat ntuples for signal
@@ -28,15 +29,20 @@ pip3 install tensorboard
   - signal + bkg test sample
   - signal + bkg train sample
 
-3. Run train_tmva.py to train tmva. Use 2 events for test sample to be able to save 'train' sample.
+4. split_kfolds.py: Split train sample by k-folds to be used for finding average performance
+  Input: signal + bkg train sample
+  Ouptut: k samples in ntuples_kfold
+
+5. Run train_tmva_run2.py, train_tmva_raw.py to train tmva. 
   Input: signal + bkg train sample
   Output: tmva root file
 
-4. Run use_tmva.C to apply on testing sample
+6. Run use_tmva.C to apply on testing sample
   Input: 
   - signal + bkg test sample
   Output: root that has test_tree and train_tree
 
-5. Train nn with train_nn,py. 
+7. Train nn with train_nn,py. 
 
-6. Train bdt with train_bdt.py.
+8. Train bdt with train_bdt.py.
+
