@@ -400,6 +400,46 @@ class scaled_bce_signi_res_loss(nn.Module):
     #print(f'wgt_bce: {wgt_bce} signi_res: {signi_res/self.signi_divide} loss: {loss}')
     return loss
 
+class scaled_bce_signi_mass_diff_loss(nn.Module):
+  def __init__(self, signi_divide = 1./3):
+    super(scaled_bce_signi_mass_diff_loss, self).__init__()
+    self.bce_loss = nn.BCELoss(reduction='none')
+    self.signal_scale = 1.
+    self.bkg_scale = 1.
+    self.signi_divide = signi_divide
+
+  def set_scale(self, signal_nevents, bkg_nevents):
+    if signal_nevents > bkg_nevents: self.signal_scale = bkg_nevents * 1. /signal_nevents
+    else: self.bkg_scale = signal_nevents * 1. /bkg_nevents
+
+  def forward(self, output, target, weight, mass):
+    #print(f'output: {output.shape}')
+    #print(f'target: {target.shape}')
+    with torch.no_grad():
+      weight = target.detach().clone()
+      weight[weight==1.] = self.signal_scale
+      weight[weight==0.] = self.bkg_scale
+    #print(f'weight: {weight.shape}')
+    #print(f'weight: {weight[:30]}')
+    #print(f'target: {target[:30]}')
+    bce = self.bce_loss(output, target)
+    wgt_bce = torch.mean(weight * bce)
+    signal = torch.sum(output * target * weight)
+
+    mass_diff = (mass.squeeze()-125.)*target.squeeze()*output.squeeze()
+    mass_res = torch.sqrt((torch.sum(mass_diff**2)-(torch.sum(mass_diff)**2/torch.sum(output.squeeze()*target.squeeze())))/torch.sum(output.squeeze()*target.squeeze()))
+    #print(f'mass_res: {mass_res}')
+    avg_signal_res = mass_res
+    #avg_signal_res = torch.sum(output.squeeze() * target.squeeze() * resolution) / torch.sum(output.squeeze() * target.squeeze())
+    bkg = torch.sum(output * (1-target) * weight)
+    bkg_with_res = bkg * 2. * avg_signal_res
+    signi_res = torch.sqrt(signal+bkg_with_res)/signal
+    #print(f'bce: {bce.shape}')
+    #print(f'weight*bce: {(weight * bce).shape}')
+    loss =  wgt_bce + signi_res / self.signi_divide
+    #print(f'wgt_bce: {wgt_bce} signi_res: {signi_res/self.signi_divide} loss: {loss}')
+    return loss
+
 class z_loss(nn.Module):
   def __init__(self, eps = 1e-7):
     super(z_loss, self).__init__()
@@ -643,6 +683,11 @@ def train(dataloader, model, loss_fn, optimizer, use_weight_in_loss = False, use
         #print(f'y: {y}, size: {y.size()}')
         #print('pred squeeze: ',pred.squeeze())
         #loss = loss_fn(pred, y)
+        #mass_diff = (spec[:,0].to(device).type(torch.float32)-125.)*y*pred.squeeze()
+        #mass_res = torch.sqrt((torch.sum(mass_diff**2)-(torch.sum(mass_diff)**2/torch.sum(pred.squeeze()*y.squeeze())))/torch.sum(pred.squeeze()*y.squeeze()))
+        #res = (X[:,5]+1)*(normalize_max_min[5][1]-normalize_max_min[5][0])/2+normalize_max_min[5][0]
+        #avg_res = torch.sum(pred.squeeze() * y.squeeze() * res) / torch.sum(pred.squeeze() * y.squeeze())
+        #print(f'res: {avg_res} diff: {mass_res}')
 
         loss = calculate_loss(X, y, pred, spec, loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
         #if use_weight_in_loss == False: 
@@ -780,7 +825,7 @@ def evaluate_sample(dataloader, device, model, loss_fn, use_weight_in_loss = Fal
         # Collect information for evaluation
         x_array.extend(X.cpu().numpy())
         y_array.extend(y.cpu().numpy())
-        if (pred.squeeze().shape==torch.Size([])): pred_array.append(pred.squeeze().numpy())
+        if (pred.squeeze().shape==torch.Size([])): pred_array.append(pred.squeeze().cpu().numpy())
         else: pred_array.extend(pred.squeeze().cpu().numpy())
         mass_array.extend(spec[:,0])
         w_lumi_array.extend(spec[:,1])
@@ -851,13 +896,16 @@ if __name__ == "__main__":
   # 1: Use tmva training, 2: Use previous nn training
   do_fine_tune = 0
   model_filename = 'runs/May20_01-59-34_hepmacprojb.local/model_epoch_4990.pt'
+  batch_size = 1
   #batch_size = 128
   #batch_size = 4096
-  batch_size = 8192
+  #batch_size = 8192 # most used
   #batch_size = 16384 # crashes with memory issue
+  test_batch_size = 8192
 
-  epochs = 10 * batch_size # Keeps number of updates on model constant
-  eval_epoch = 100
+  epochs = 1000 * batch_size # Keeps number of updates on model constant
+  #eval_epoch = 100
+  eval_epoch = 1 
 
   #epochs = 100
   #eval_epoch = 10
@@ -875,8 +923,8 @@ if __name__ == "__main__":
   #test_filename = 'test_sample_run2_0p05.root'
   #test_full_filename = 'test_full_sample_run2_0p05.root'
 
-  #do_test = False
-  do_test = True
+  do_test = False
+  #do_test = True
 
   #batch_size = 1
   # res_los needs resolution branch to be index=5
@@ -891,6 +939,7 @@ if __name__ == "__main__":
   # 7: 1/100*sqrt(s+b)/s
   # 8: 1/500*sqrt(s+b*res)/s
   # 9: cross-entropy with sig/bkg scaled + 1/3*sqrt(s+b*res)/s
+  # 50: cross-entropy with sig/bkg scaled + 1/3*sqrt(s+b*mass_diff)/s
   # 100: s/sqrt(s+b*res)
   # 200: cross-entropy + 5*disco
   # 201: cross-entropy + 5*disco (only on bkg)
@@ -902,7 +951,7 @@ if __name__ == "__main__":
   # 207: (tune) cross-entropy + 5*disco (only on bkg) + 1/6000*sqrt(s+b*res)/s
   # 300: cross-entropy with weights scaled to nevents + 5*disco (only on bkg) + 1/10000*sqrt(s+b*res)/s
   # Compare between 0, 201, 203
-  train_loss = 9
+  train_loss = 6
   #log_dir = f'runs/loss{train_loss}'
   #output_name = f'nn_{log_dir}'.replace('/','_')
 
@@ -969,6 +1018,13 @@ if __name__ == "__main__":
     use_weight_in_loss = True
     use_res_in_loss = True
     loss_filename = '_scaled_bce_loss'
+    use_full_window = False
+    set_test_train_nevents = True
+  elif train_loss == 50: 
+    loss_fn = scaled_bce_signi_mass_diff_loss()
+    use_weight_in_loss = True
+    use_mass_in_loss = True
+    loss_filename = '_scaled_bce_massdiff_loss'
     use_full_window = False
     set_test_train_nevents = True
   elif train_loss == 100: 
@@ -1206,7 +1262,8 @@ if __name__ == "__main__":
 
   
   train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-  test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+  train_eval_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=test_batch_size, shuffle=False)
+  test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=test_batch_size, shuffle=False)
 
   #with torch.no_grad():
   #  model.eval()
@@ -1249,7 +1306,7 @@ if __name__ == "__main__":
       results = {'train': {}, 'test': {}}
       filename = f'trash/evaluate_trainloss{train_loss}_nvar{nvar}.root'
       # Returns loss, sample arrays
-      results['train'] = evaluate_sample(train_dataloader, device, model, loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
+      results['train'] = evaluate_sample(train_eval_dataloader, device, model, loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
       results['test'] = evaluate_sample(test_dataloader, device, model, test_loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
       # Create evaluation root file
       with uproot.recreate(filename) as root_file:
