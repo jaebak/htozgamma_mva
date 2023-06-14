@@ -10,49 +10,36 @@ import numpy as np
 
 if __name__ == '__main__':
 
-  # weight_types: 1 is decorr, 2 is use weight, 3 is weight equally, 4 is only shape decorr, 5 is no weight
-  weight_type = 5
+  decorr = True
 
-  feature_names = ['min_dR', 'max_dR', 'pt_mass', 'cosTheta', 'costheta', 'phi',
+  feature_names = ['photon_mva', 'min_dR', 'pt_mass', 'cosTheta', 'costheta', 
+                   'photon_res', 
+                   #'llg_mass_err',
                    'photon_rapidity', 'l1_rapidity', 'l2_rapidity',
-                   'llg_flavor', 'llg_ptt'
+                   #'llg_flavor',
                    ]
 
-  use_full_mass_windows = False
-  use_weight = True
-  if weight_type == 1:
-    use_full_mass_windows = True
-    gbdt_filename = 'mva_output_ntuples/gbdt_run2_decorr.root'
-    xgbt_filename = 'mva_output_ntuples/xgbdt_run2_decorr.root'
-  elif weight_type == 2:
-    gbdt_filename = 'mva_output_ntuples/gbdt_run2.root'
-    xgbt_filename = 'mva_output_ntuples/xgbdt_run2.root'
-  elif weight_type == 3:
-    gbdt_filename = 'mva_output_ntuples/gbdt_wequal_run2.root'
-    xgbt_filename = 'mva_output_ntuples/xgbdt_wequal_run2.root'
-  elif weight_type == 4:
-    use_full_mass_windows = True
-    gbdt_filename = 'mva_output_ntuples/gbdt_run2_decorr_shape.root'
-    xgbt_filename = 'mva_output_ntuples/xgbdt_run2_decorr_shape.root'
-  elif weight_type == 5:
-    gbdt_filename = 'mva_output_ntuples/gbdt_run2_noweight.root'
-    xgbt_filename = 'mva_output_ntuples/xgbdt_run2_noweight.root'
-    use_weight = False
-
-  if use_full_mass_windows:
-    train_filename = 'mva_input_ntuples/train_sample_run2_lumi_winfull.root'
-    test_filename = 'mva_input_ntuples/test_sample_run2_lumi_winfull.root'
-    test_full_filename = 'mva_input_ntuples/test_full_sample_run2_lumi_winfull.root'
+  if decorr:
+    train_filename = 'train_sample_run2_lumi_winfull.root'
+    test_filename = 'test_sample_run2_lumi_winfull.root'
+    test_full_filename = 'test_full_sample_run2_lumi_winfull.root'
+    gbdt_filename = 'ntuples_mva/gbdt_run2_decorr.root'
+    xgbt_filename = 'ntuples_mva/xgbdt_run2_decorr.root'
   else:
-    train_filename = 'mva_input_ntuples/train_sample_run2_lumi.root'
-    test_filename = 'mva_input_ntuples/test_sample_run2_lumi.root'
-    test_full_filename = 'mva_input_ntuples/test_full_sample_run2_lumi.root'
+    train_filename = 'train_sample_run2_lumi.root'
+    test_filename = 'test_sample_run2_lumi.root'
+    test_full_filename = 'test_full_sample_run2_lumi.root'
+    gbdt_filename = 'ntuples_mva/gbdt_run2.root'
+    xgbt_filename = 'ntuples_mva/xgbdt_run2.root'
 
   train_dataset = RootDataset(root_filename= train_filename,
                             tree_name = "train_tree",
                             features = feature_names,
+                            #normalize = normalize_max_min,
                             cut = '1',
-                            spectators = ['llg_mass', 'w_lumiXyearXshape', 'w_lumiXyear', 'classID', 'w_llg_mass'],
+                            #spectators = ['llg_mass', 'w_lumi'],
+                            #spectators = ['llg_mass', 'w_llg_mass', 'w_lumiXyear', 'classID'],
+                            spectators = ['llg_mass', 'w_lumiXyearXshape', 'w_lumiXyear', 'classID'],
                             class_branch = ['classID'])
   print(f'train entries: {len(train_dataset)}')
 
@@ -61,44 +48,39 @@ if __name__ == '__main__':
   train_label_array = train_dataset.label_array[:,1]
   train_spec_array = train_dataset.spec_array
   train_mass_array = train_dataset.spec_array[:,0]
-  if weight_type == 1: 
+  if decorr: 
     train_weight_array = train_dataset.spec_array[:,1]
-  elif weight_type == 3:
+  else: 
     nbkg = np.count_nonzero(train_dataset.spec_array[:,3]==0)
     nsig = np.count_nonzero(train_dataset.spec_array[:,3]==1)
     nsig_nbkg = nsig * 1./ nbkg
-    # weight signal and bkg equally
-    train_weight_array = np.array(train_dataset.spec_array[:,3])
-    train_weight_array[train_weight_array == 0] = nsig_nbkg
-    print(f'nsig: {nsig} nbkg: {nbkg}. Reweight bkg by {nsig_nbkg} sum: {np.sum(train_weight_array)}')
-  elif weight_type == 2: 
+    ## weight signal and bkg equally
+    #train_weight_array = np.array(train_dataset.spec_array[:,3])
+    #train_weight_array[train_weight_array == 0] = nsig_nbkg
+    ##print(f'nsig: {nsig} nbkg: {nbkg}. Reweight bkg by {nsig_nbkg} sum: {np.sum(train_weight_array)}')
     # weight according to weight
     train_weight_array = np.array(train_dataset.spec_array[:,2])
-  elif weight_type == 4: 
-    # weight according to weight
-    train_weight_array = np.array(train_dataset.spec_array[:,4])
+    # Could try to make signal and bkg have same number of events.
   train_w_lumi_array = train_dataset.spec_array[:,2]
   nlabels = train_hot_label_array.shape[1]
-  if use_weight:
-    # Set negative weights to 0
-    train_weight_array[train_weight_array<0] = 0.
+  # Set negative weights to 0
+  train_weight_array[train_weight_array<0] = 0.
 
   # Train gradient boosted decision tree
   print("Training gradient BDT")
   gbdt_classifier = sklearn.ensemble.GradientBoostingClassifier(n_estimators=100, learning_rate=0.1, max_depth=3, random_state=0)
-  if use_weight: gbdt_classifier.fit(train_feature_array, train_hot_label_array[:,nlabels-1], train_weight_array)
-  else: gbdt_classifier.fit(train_feature_array, train_hot_label_array[:,nlabels-1])
+  gbdt_classifier.fit(train_feature_array, train_hot_label_array[:,nlabels-1], train_weight_array)
 
   # Train xgboost
   print("Training xgboost")
   xgbdt_classifier = xgboost.XGBClassifier(max_depth=3, n_estimators=100)
-  if use_weight: xgbdt_classifier.fit(train_feature_array, train_hot_label_array[:,nlabels-1], sample_weight=train_weight_array)
-  else: xgbdt_classifier.fit(train_feature_array, train_hot_label_array[:,nlabels-1])
+  xgbdt_classifier.fit(train_feature_array, train_hot_label_array[:,nlabels-1], sample_weight=train_weight_array)
 
   # Evaluate
   test_dataset = RootDataset(root_filename=test_filename,
                             tree_name = "test_tree",
                             features = feature_names,
+                            #normalize = normalize_max_min,
                             cut = '1',
                             spectators = ['llg_mass', 'w_lumiXyear'],
                             class_branch = ['classID'])
@@ -126,7 +108,6 @@ if __name__ == '__main__':
   eval_weight_array = eval_dataset.spec_array[:,1]
 
 
-  train_weight_array = train_dataset.spec_array[:,2]
 
   # Boosted decision tree
   # Predict

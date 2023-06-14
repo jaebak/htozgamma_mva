@@ -1344,8 +1344,7 @@ if __name__ == "__main__":
   ##signi_i11_mva = load_mva_dict('nn_loss203_i11_run2.root', 'signi_i11 mva')
   #signi_i11_fullwin_mva = load_mva_dict('nn_loss203_i11_fullwin_run2.root', 'signi i11 fullwin mva')
 
-  run2_bdt = load_tmva_eval_dict('mva_output_ntuples/run2_bdt.root', 'mva_output_ntuples/tmva_evaluate_bdt_run2.root', 'BDT', 'run2 bdt', dataset_name='tmva_run2_bdt', mva_input=['min_dR', 'max_dR', 'pt_mass', 'cosTheta', 'costheta', 'phi', 'photon_rapidity', 'l1_rapidity', 'l2_rapidity', 'llg_flavor', 'llg_ptt'])
-  #tmva_nn = load_tmva_eval_dict('mva_output_ntuples/TMVA_nn.root', 'mva_output_ntuples/tmva_evaluate_nn.root','DNN', 'tmva nn', dataset_name='tmva_nn', mva_input=['min_dR', 'max_dR', 'pt_mass', 'cosTheta', 'costheta', 'phi', 'photon_rapidity', 'l1_rapidity', 'l2_rapidity', 'llg_flavor', 'llg_ptt'])
+  run2_bdt = load_tmva_eval_dict('mva_output_ntuples/run2_bdt.root', 'tmva_evaluate_run2_bdt.root', 'BDT', 'run2 bdt', dataset_name='tmva_run2_bdt', mva_input=['photon_mva', 'min_dR', 'max_dR', 'pt_mass', 'cosTheta', 'costheta', 'phi', 'photon_res_e', 'photon_rapidity', 'l1_rapidity', 'l2_rapidity',])
   #reduced_bdt = load_tmva_eval_dict('mva_output_ntuples/reduced_bdt.root', 'tmva_evaluate_reduced_bdt.root', 'BDT', 'reduced bdt', dataset_name='reduced_bdt')
   #raw_bdt = load_tmva_eval_dict('mva_output_ntuples/raw_bdt.root', 'tmva_evaluate_raw_bdt.root', 'BDT', 'raw bdt', dataset_name='raw_bdt', mva_input=['photon_mva', 'llg_ptt', 'llg_eta', 'llg_phi', 'z_eta', 'z_phi', 'l1_rapidity', 'l1_phi', 'l2_rapidity', 'l2_phi', 'gamma_eta', 'gamma_phi'])
   #var12_bdt = load_tmva_eval_dict('mva_output_ntuples/var12_bdt.root', 'tmva_evaluate_var12_bdt.root', 'BDT', 'var12 bdt', dataset_name='var12_bdt', mva_input=['photon_mva', 'min_dR', 'pt_mass', 'cosTheta', 'costheta', 'llg_mass_err', 'photon_rapidity', 'l1_rapidity', 'l2_rapidity', 'llg_flavor', 'max_dR', 'llg_ptt'])
@@ -1353,16 +1352,12 @@ if __name__ == "__main__":
   ##signi_i11_fullwin_mva = load_mva_dict('nn_loss203_i11_fullwin_run2.root', 'signi i11 fullwin mva')
   gbdt_decorr = load_mva_dict('mva_output_ntuples/gbdt_run2_decorr.root', 'gbdt decorr')
   xgbdt_decorr = load_mva_dict('mva_output_ntuples/xgbdt_run2_decorr.root', 'xgbdt decorr')
-  gbdt_weq = load_mva_dict('mva_output_ntuples/gbdt_wequal_run2.root', 'gbdt eq. w')
-  xgbdt_weq = load_mva_dict('mva_output_ntuples/xgbdt_wequal_run2.root', 'xgbdt eq. w')
-  gbdt_no_weight = load_mva_dict('mva_output_ntuples/gbdt_run2_noweight.root', 'gbdt no. w')
-  xgbdt_no_weight = load_mva_dict('mva_output_ntuples/xgbdt_run2_noweight.root', 'xgbdt no. w')
-  torch_nn_eqw = load_mva_dict('mva_output_ntuples/nn_loss6_run2.root', 'nn eqw')
-  torch_nn = load_mva_dict('mva_output_ntuples/nn_loss0_run2.root', 'nn')
-  #gbdt = load_mva_dict('mva_output_ntuples/gbdt_run2.root', 'gbdt')
-  #xgbdt = load_mva_dict('mva_output_ntuples/xgbdt_run2.root', 'xgbdt')
+  gbdt = load_mva_dict('mva_output_ntuples/gbdt_run2.root', 'gbdt')
+  xgbdt = load_mva_dict('mva_output_ntuples/xgbdt_run2.root', 'xgbdt')
   #gbdt_noweight_decorr = load_mva_dict('mva_output_ntuples/gbdt_run2_noweight_decorr.root', 'gbdt nowgt decorr')
   #xgbdt_noweight_decorr = load_mva_dict('mva_output_ntuples/xgbdt_run2_noweight_decorr.root', 'xgbdt nowgt decorr')
+  #gbdt_noweight = load_mva_dict('mva_output_ntuples/gbdt_run2_noweight.root', 'gbdt nowgt ')
+  #xgbdt_noweight = load_mva_dict('mva_output_ntuples/xgbdt_run2_noweight.root', 'xgbdt nowgt')
   ##entropy_mva = load_mva_dict('nn_loss5_run2.root', 'nn')
   ##disco_mva = load_mva_dict('nn_loss201_run2.root', 'nn disco')
   ###disco_mva = load_mva_dict('ntuples_mva/nn_runs_loss201.root', 'disco')
@@ -1412,9 +1407,7 @@ if __name__ == "__main__":
 
   print('Loaded dicts')
 
-  info_mvas = [run2_bdt,gbdt_weq,xgbdt_weq,gbdt_no_weight,xgbdt_no_weight,torch_nn,torch_nn_eqw]
-  #info_mvas = [run2_bdt,tmva_nn,gbdt_weq,xgbdt_weq,gbdt_no_weight,xgbdt_no_weight,torch_nn,torch_nn_eqw]
-  #info_mvas = [run2_bdt,tmva_nn,gbdt_weq,xgbdt_weq,gbdt_no_weight,xgbdt_no_weight,xgbdt_decorr]
+  info_mvas = [run2_bdt,gbdt,xgbdt,gbdt_decorr,xgbdt_decorr]
   #info_mvas = [scaled_entropy_mva, signi_only_mva, signi_res_mva, scaled_entropy_signi_mva]
   #info_mvas = [run2_bdt,reduced_bdt,raw_bdt,var12_bdt,signi_mva]
   #info_mvas = [reduced_bdt,k1_reduced_bdt,k2_reduced_bdt,k3_reduced_bdt,k4_reduced_bdt,k5_reduced_bdt,k6_reduced_bdt,k7_reduced_bdt,k8_reduced_bdt,k9_reduced_bdt,k10_reduced_bdt,]
@@ -1440,8 +1433,7 @@ if __name__ == "__main__":
   evaluate_roc(info_mvas) # negative weights set to 0
   #evaluate_roc(info_mvas, no_weight=True) # unweighted roc 
   evaluate_overtraining(info_mvas)
-  #evaluate_significance_bins_with_resolution(info_mvas, tree_type='test_full_tree')
-  evaluate_significance_bins_with_resolution(info_mvas, tree_type='train_tree')
+  evaluate_significance_bins_with_resolution(info_mvas, tree_type='test_full_tree')
   evaluate_tprfpr(info_mvas, tree_type='test_full_tree')
   evaluate_correlation(info_mvas, tree_type='test_full_tree')
 

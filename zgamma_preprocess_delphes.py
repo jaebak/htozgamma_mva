@@ -180,13 +180,13 @@ if __name__=='__main__':
       'phi', 'photon_rapidity','l1_rapidity','l2_rapidity','photon_pt_mass', 'llg_mass', 'llg_flavor', 'gamma_pt',
       'llg_eta', 'llg_phi', 'llg_ptt', 'z_eta', 'z_phi', 'l1_phi', 'l2_phi', 'gamma_eta', 'gamma_phi', 
       'w_lumiXyear', 'w_lumi')
-  signal_files = ['ntuple_ggH_HToZG_ZToLL.root']
-  bkg_files = ['ntuple_ZG_ZToLL.root']
+  signal_files = ['input_ntuples/ntuple_ggH_HToZG_ZToLL_run02.root']
+  bkg_files = ['input_ntuples/ntuple_ZG_ZToLL_run02.root']
   signal_entries = get_entries(signal_files, 'tree')
   bkg_entries = get_entries(bkg_files, 'tree')
   write_ntuples(signal_files,
       cuts,
-      'ntuples/train_decorr_sig_run2_lumi.root',
+      'processed_ntuples/train_decorr_sig_run2_lumi.root',
       #'ntuples/train_decorr_sig.root',
       defines,
       'tree',
@@ -194,12 +194,12 @@ if __name__=='__main__':
       signal_entries)
   write_ntuples(bkg_files,
       cuts,
-      'ntuples/train_decorr_bak_run2_lumi.root',
+      'processed_ntuples/train_decorr_bak_run2_lumi.root',
       #'ntuples/train_decorr_bak.root',
       defines,
       'tree',
       branches,
       bkg_entries)
 
-  #rootutils.plot_variables('ntuples/train_decorr_sig_run2_lumi.root', 'tree', branches, out_folder = 'plots')
-  #rootutils.plot_variables('ntuples/train_decorr_bak_run2_lumi.root', 'tree', branches, out_folder = 'plots')
+  rootutils.plot_variables('processed_ntuples/train_decorr_sig_run2_lumi.root', 'tree', branches, out_folder = 'plots')
+  rootutils.plot_variables('processed_ntuples/train_decorr_bak_run2_lumi.root', 'tree', branches, out_folder = 'plots')

@@ -98,18 +98,21 @@ void parse_xml(string tmva_weights, vector<string> & tmva_variables, vector<stri
 using namespace TMVA;
 void use_tmva() {
 
-  // evaluate_mva = 1 is for bdt, 
-  // evaluate_mva = 2 is for nn, 
+  //// evaluate_mva = 1 is for bdt, evaluate_mva = 2 is for nn, 
   // evaluate_mva = 3 is for raw bdt, 
   // evaluate_mva = 4 is for run2 bdt
   // evaluate_mva = 5 is for reduced bdt
   // evaluate_mva = 6 is for var12 bdt
-  int evaluate_mva = 2;
+  int evaluate_mva = 6;
 
   // Load bdt tmva
   TMVA::Reader *tmva_reader = new TMVA::Reader( "!Color:!Silent" );
 
-  string input_test_root = "mva_input_ntuples/test_full_sample_run2_lumi.root";
+  //string input_train_root = "train_sample.root";
+  //string input_train_tree = "train_tree";
+  //string input_test_root = "test_full_sample_run2.root";
+  //string input_test_root = "test_full_sample_run2_winfull.root";
+  string input_test_root = "test_full_sample_run2_lumi.root";
   string input_test_tree = "test_tree";
   string label = "classID";
 
@@ -117,12 +120,12 @@ void use_tmva() {
   string tmva_weights;
   string tmva_output;
   if (evaluate_mva == 1) {
-    output_root = "mva_output_ntuples/tmva_evaluate_bdt_run2.root";
-    tmva_weights = "tmva_run2_bdt/weights/TMVAClassification_BDT.weights.xml";
+    output_root = "tmva_evaluate_bdt_run2.root";
+    tmva_weights = "dataset/weights/TMVAClassification_BDT.weights.xml";
     tmva_output = "BDT";
   } else if (evaluate_mva == 2) {
-    output_root = "mva_output_ntuples/tmva_evaluate_nn.root";
-    tmva_weights = "tmva_nn/weights/TMVAClassification_DNN.weights.xml";
+    output_root = "tmva_evaluate_nn.root";
+    tmva_weights = "dataset/weights/TMVAClassification_DNN.weights.xml";
     tmva_output = "DNN";
   } else if (evaluate_mva == 3) {
     output_root = "tmva_evaluate_raw_bdt.root";
@@ -142,6 +145,22 @@ void use_tmva() {
     tmva_output = "BDT";
   }
 
+  //// For BDT
+  //string output_root = "tmva_evaluate_bdt.root";
+  //string tmva_weights = "dataset/weights/TMVAClassification_BDT.weights.xml";
+  //string tmva_output = "BDT";
+  ////vector<string> tmva_variables = {"photon_mva", "min_dR", "pt_mass", "cosTheta", "costheta",
+  ////   "photon_res", "photon_rapidity", "l1_rapidity", "l2_rapidity"};
+  ////vector<string> tmva_spectators = {"llg_mass", "w_lumi"};
+
+  //// For DNN
+  //string output_root = "tmva_evaluate_nn.root";
+  //string tmva_weights = "dataset/weights/TMVAClassification_DNN.weights.xml";
+  //string tmva_output = "DNN";
+  ////vector<string> tmva_variables = {"photon_mva", "min_dR", "pt_mass", "cosTheta", "costheta",
+  ////   "llg_mass_err", "photon_rapidity", "l1_rapidity", "l2_rapidity", "llg_flavor"};
+  ////vector<string> tmva_spectators = {"llg_mass", "w_lumi"};
+
   // Parse xml file to get variables and spectators
   vector<string> tmva_variables;
   vector<string> tmva_spectators;
@@ -157,12 +176,24 @@ void use_tmva() {
 
   // Add variables to reader
   for (auto var : tmva_variables) tmva_reader->AddVariable(var.c_str(), &float_store[var]);
+  //bdt_reader->AddVariable( "photon_mva", &float_store["photon_mva"] );
+  //bdt_reader->AddVariable( "min_dR", &float_store["min_dR"] );
+  //bdt_reader->AddVariable( "pt_mass", &float_store["pt_mass"] );
+  //bdt_reader->AddVariable( "cosTheta", &float_store["cosTheta"] );
+  //bdt_reader->AddVariable( "costheta", &float_store["costheta"] );
+  //bdt_reader->AddVariable( "photon_res", &float_store["photon_res"] );
+  //bdt_reader->AddVariable( "photon_rapidity", &float_store["photon_rapidity"] );
+  //bdt_reader->AddVariable( "l1_rapidity", &float_store["l1_rapidity"] );
+  //bdt_reader->AddVariable( "l2_rapidity", &float_store["l2_rapidity"] );
   for (auto var : tmva_spectators) tmva_reader->AddSpectator(var.c_str(), &float_store[var]);
+  //bdt_reader->AddSpectator( "llg_mass",  &float_store["llg_mass"] );
+  //bdt_reader->AddSpectator( "w_lumi",  &float_store["w_lumi"] );
   tmva_reader->BookMVA(tmva_output.c_str(), tmva_weights.c_str());
 
   //// Evaluate train sample
   //evaluate(tmva_reader, float_store, int_store, tmva_variables, tmva_spectators, tmva_output, label, input_train_root, input_train_tree, output_root);
   // Evaluate test sample
+  //evaluate(tmva_reader, float_store, int_store, tmva_variables, tmva_spectators, tmva_output, label, input_test_root, input_test_tree, output_root, true);
   evaluate(tmva_reader, float_store, int_store, tmva_variables, tmva_spectators, tmva_output, label, input_test_root, input_test_tree, output_root);
 
 }

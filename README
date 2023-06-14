@@ -42,7 +42,7 @@ pip3 install tensorboard
   - signal + bkg test sample
   Output: root that has test_tree and train_tree
 
-7. Train nn with train_nn,py. 
+7. Train nn with train_nn.py. 
 
 8. Train bdt with train_bdt.py.
 

@@ -75,24 +75,67 @@ def combine_signal_bkg(bkg_filename, bkg_treename,
 
 if __name__ == '__main__':
 
-  full_mass_window = True
+  full_mass_window = False
 
-  input_signal_filename = 'processed_ntuples/train_decorr_sig_shapewgt_run2_lumi.root'
-  input_bkg_filename = 'processed_ntuples/train_decorr_bak_shapewgt_run2_lumi.root'
+  #input_signal_filename = 'ntuples/train_decorr_sig_shapewgt_run2.root'
+  #input_bkg_filename = 'ntuples/train_decorr_bak_shapewgt_run2.root'
+
+  input_signal_filename = 'ntuples/train_decorr_sig_shapewgt_run2_lumi.root'
+  input_bkg_filename = 'ntuples/train_decorr_bak_shapewgt_run2_lumi.root'
+
+  #input_signal_filename = 'ntuples/train_decorr_sig.root'
+  #input_bkg_filename = 'ntuples/train_decorr_bak.root'
+
+  #split_signal_filename = 'signal_sample_run2.root'
+  #split_bkg_filename = 'bkg_sample_run2.root'
+  #train_sample_filename = 'train_sample_run2.root'
+  #test_sample_filename = 'test_sample_run2.root'
+  #test_full_sample_filename = 'test_full_sample_run2.root'
+
+  #split_signal_filename = 'signal_sample_run2_0p05.root'
+  #split_bkg_filename = 'bkg_sample_run2_0p05.root'
+  #train_sample_filename = 'train_sample_run2_0p05.root'
+  #test_sample_filename = 'test_sample_run2_0p05.root'
+  #test_full_sample_filename = 'test_full_sample_run2_0p05.root'
+
+  #split_signal_filename = 'signal_sample_run2_winfull.root'
+  #split_bkg_filename = 'bkg_sample_run2_winfull.root'
+  #train_sample_filename = 'train_sample_run2_winfull.root'
+  #test_sample_filename = 'test_sample_run2_winfull.root'
+  #test_full_sample_filename = 'test_full_sample_run2_winfull.root'
 
   if full_mass_window:
-    split_signal_filename = 'mva_input_ntuples/signal_sample_run2_lumi_winfull.root'
-    split_bkg_filename = 'mva_input_ntuples/bkg_sample_run2_lumi_winfull.root'
-    train_sample_filename = 'mva_input_ntuples/train_sample_run2_lumi_winfull.root'
-    test_sample_filename = 'mva_input_ntuples/test_sample_run2_lumi_winfull.root'
-    test_full_sample_filename = 'mva_input_ntuples/test_full_sample_run2_lumi_winfull.root'
+    split_signal_filename = 'signal_sample_run2_lumi_winfull.root'
+    split_bkg_filename = 'bkg_sample_run2_lumi_winfull.root'
+    train_sample_filename = 'train_sample_run2_lumi_winfull.root'
+    test_sample_filename = 'test_sample_run2_lumi_winfull.root'
+    test_full_sample_filename = 'test_full_sample_run2_lumi_winfull.root'
   else:
-    split_signal_filename = 'mva_input_ntuples/signal_sample_run2_lumi.root'
-    split_bkg_filename = 'mva_input_ntuples/bkg_sample_run2_lumi.root'
-    train_sample_filename = 'mva_input_ntuples/train_sample_run2_lumi.root'
-    test_sample_filename = 'mva_input_ntuples/test_sample_run2_lumi.root'
-    test_full_sample_filename = 'mva_input_ntuples/test_full_sample_run2_lumi.root'
+    split_signal_filename = 'signal_sample_run2_lumi.root'
+    split_bkg_filename = 'bkg_sample_run2_lumi.root'
+    train_sample_filename = 'train_sample_run2_lumi.root'
+    test_sample_filename = 'test_sample_run2_lumi.root'
+    test_full_sample_filename = 'test_full_sample_run2_lumi.root'
 
+  #split_signal_filename = 'signal_sample.root'
+  #split_bkg_filename = 'bkg_sample.root'
+  #train_sample_filename = 'train_sample.root'
+  #test_sample_filename = 'test_sample.root'
+  #test_full_sample_filename = 'test_full_sample.root'
+
+
+  ## List of branches from zgamma_preprocess.py
+  #branches = ['photon_mva','min_dR','max_dR','pt_mass','cosTheta',
+  #            'costheta', 'phi','photon_res','photon_rapidity','l1_rapidity',
+  #            'l2_rapidity', 'decorr_photon_pt','photon_pt_mass', 'w_lumi', 'llg_mass', 
+  #            'llg_mass_err', 'llg_flavor', 'gamma_pt', 'w_llg_mass', 'w_lumiXyearXshape',
+  #            'llg_eta', 'llg_phi', 'llg_ptt', 'z_eta', 'z_phi', 
+  #            'l1_phi', 'l2_phi', 'gamma_eta', 'gamma_phi', 'w_lumiXyear', 'year']
+
+  #branches = ['photon_mva','min_dR','max_dR','pt_mass','cosTheta',
+  #            'costheta', 'phi','photon_res','photon_rapidity','l1_rapidity',
+  #            'l2_rapidity', 'decorr_photon_pt','photon_pt_mass', 'w_lumi', 'llg_mass', 
+  #            'llg_mass_err', 'llg_flavor', 'gamma_pt']
 
   np.random.seed(1)
   # Create training and test sample. Randomize events between training and testing. Scales up weights.
@@ -100,9 +143,11 @@ if __name__ == '__main__':
   split_ntuple( in_filename = input_signal_filename, in_treename = 'tree', 
     cut = '1',
     train_fraction = 0.8, weight_branch_name = 'w_lumiXyear', out_filename = split_signal_filename)
+    #train_fraction = 0.8, weight_branch_index = 13, out_filename = split_signal_filename)
   split_ntuple( in_filename = input_bkg_filename, in_treename = 'tree',
     cut = '1',
     train_fraction = 0.8, weight_branch_name = 'w_lumiXyear', out_filename = split_bkg_filename)
+    #train_fraction = 0.8, weight_branch_index = 13, out_filename = split_bkg_filename)
 
   if full_mass_window: cut = '1'
   else: cut = '(llg_mass>120) & (llg_mass<130)'
@@ -110,12 +155,16 @@ if __name__ == '__main__':
   # Combine signal and bkg for train sample. Randomizes events between signal and bkg.
   combine_signal_bkg(bkg_filename = split_bkg_filename, bkg_treename = 'train_tree',
     signal_filename = split_signal_filename, signal_treename = 'train_tree',
+    #cut = '(llg_mass>120) & (llg_mass<130)',
+    #cut = '(llg_mass>110) & (llg_mass<140)',
     cut = cut,
     out_filename = train_sample_filename, out_treename = 'train_tree')
 
   # Combine signal and bkg for test sample. Randomizes events between signal and bkg. # Note: When trying to update root file, it created issues.
   combine_signal_bkg(bkg_filename = split_bkg_filename, bkg_treename = 'test_tree',
     signal_filename = split_signal_filename, signal_treename = 'test_tree',
+    #cut = '(llg_mass>120) & (llg_mass<130)',
+    #cut = '(llg_mass>110) & (llg_mass<140)',
     cut = cut,
     out_filename = test_sample_filename, out_treename = 'test_tree')
 

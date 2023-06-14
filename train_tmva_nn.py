@@ -5,12 +5,9 @@ TMVA.PyMethodBase.PyInitialize()
 import math
 import numpy as np
 import array
-import argparse
-import os
-import sys
 import time
 
-def train_bdt(folder, train_filename, test_filename, tmva_filename):
+def train_nn(folder, train_filename, test_filename, tmva_filename):
   output = TFile.Open(tmva_filename, 'RECREATE')
   factory = TMVA.Factory('TMVAClassification', output,
                          '!V:ROC:!Correlations:!Silent:Color:'
@@ -45,7 +42,21 @@ def train_bdt(folder, train_filename, test_filename, tmva_filename):
   cut_b = TCut('llg_mass>120 && llg_mass < 130');
   dataloader.PrepareTrainingAndTestTree(cut_s,cut_b,f"NormMode=NumEvents:ScaleWithPreselEff:!V");
 
-  factory.BookMethod(dataloader,TMVA.Types.kBDT,"BDT","!H:!V:NTrees=850:MinNodeSize=2.5%:MaxDepth=3:BoostType=AdaBoost:AdaBoostBeta=0.5:UseBaggedBoost:BaggedSampleFraction=0.5:SeparationType=GiniIndex:nCuts=20");
+
+  layoutString = TString("Layout=TANH|40,LINEAR")
+  #trainingString = TString("LearningRate=1e-6,ConvergenceSteps=100,BatchSize=1,TestRepetitions=10,MaxEpochs=10")
+  #trainingString = TString("LearningRate=1e-6,ConvergenceSteps=100,BatchSize=1,TestRepetitions=10,MaxEpochs=3000")
+  trainingString = TString("LearningRate=1e-6,ConvergenceSteps=100,BatchSize=1,TestRepetitions=10,MaxEpochs=80000")
+  #trainingString = TString("LearningRate=1e-6,ConvergenceSteps=100,BatchSize=1,TestRepetitions=10,MaxEpochs=100")
+  trainingStrategyString = TString("TrainingStrategy=")
+  trainingStrategyString += trainingString;
+  dnnOptionString = TString("!H:V:ErrorStrategy=CROSSENTROPY:VarTransform=N:WeightInitialization=XAVIERUNIFORM")
+  dnnOptionString.Append (":"); dnnOptionString.Append (layoutString);
+  dnnOptionString.Append (":"); dnnOptionString.Append (trainingStrategyString);
+  cpuOptionString = dnnOptionString + TString(":Architecture=CPU")
+  #cpuOptionString = dnnOptionString + TString(":Architecture=GPU")
+
+  factory.BookMethod(dataloader,TMVA.Types.kDL,"DNN",cpuOptionString);
   factory.TrainAllMethods();
   factory.TestAllMethods();
   factory.EvaluateAllMethods();
@@ -53,10 +64,10 @@ def train_bdt(folder, train_filename, test_filename, tmva_filename):
 
 if __name__ == "__main__":
   start_time = time.time()
-  train_bdt(folder="tmva_run2_bdt", 
-            train_filename="mva_input_ntuples/train_sample_run2_lumi.root", 
-            test_filename="mva_input_ntuples/test_sample_run2_lumi.root", 
-            tmva_filename="mva_output_ntuples/run2_bdt.root")
+  train_nn(folder='tmva_nn_test',
+           train_filename="mva_input_ntuples/train_sample_run2_lumi.root", 
+           test_filename="mva_input_ntuples/test_sample_run2_lumi.root", 
+           tmva_filename="mva_output_ntuples/TMVA_nn.root")
   elapsed_time = time.time() - start_time
   print(f'Training time: {elapsed_time}')
 

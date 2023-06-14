@@ -16,17 +16,17 @@ def train_bdt(folder, train_filename, test_filename, tmva_filename):
                          '!V:ROC:!Correlations:!Silent:Color:'
                          '!DrawProgressBar:AnalysisType=Classification')
   dataloader = TMVA.DataLoader(folder)
+  dataloader.AddVariable("photon_mva",'F')
   dataloader.AddVariable("min_dR",'F')
   dataloader.AddVariable("max_dR",'F')
   dataloader.AddVariable("pt_mass",'F')
   dataloader.AddVariable("cosTheta",'F')
   dataloader.AddVariable("costheta",'F')
   dataloader.AddVariable("phi",'F')
+  dataloader.AddVariable("photon_res_e",'F')
   dataloader.AddVariable("photon_rapidity",'F')
   dataloader.AddVariable("l1_rapidity",'F')
   dataloader.AddVariable("l2_rapidity",'F')
-  dataloader.AddVariable("llg_flavor",'F')
-  dataloader.AddVariable("llg_ptt",'F')
   dataloader.SetBackgroundWeightExpression("w_lumiXyear")
   dataloader.SetSignalWeightExpression("w_lumiXyear")
   dataloader.AddSpectator("llg_mass", 'F')
@@ -53,10 +53,10 @@ def train_bdt(folder, train_filename, test_filename, tmva_filename):
 
 if __name__ == "__main__":
   start_time = time.time()
-  train_bdt(folder="tmva_run2_bdt", 
-            train_filename="mva_input_ntuples/train_sample_run2_lumi.root", 
-            test_filename="mva_input_ntuples/test_sample_run2_lumi.root", 
-            tmva_filename="mva_output_ntuples/run2_bdt.root")
+  train_bdt(folder="run2_bdt", 
+            train_filename="train_sample_run2_lumi.root", 
+            test_filename="test_sample_run2_lumi.root", 
+            tmva_filename="ntuples_mva/run2_bdt.root")
   elapsed_time = time.time() - start_time
   print(f'Training time: {elapsed_time}')
 

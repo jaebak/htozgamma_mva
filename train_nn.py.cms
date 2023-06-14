@@ -896,19 +896,32 @@ if __name__ == "__main__":
   # 1: Use tmva training, 2: Use previous nn training
   do_fine_tune = 0
   model_filename = 'runs/May20_01-59-34_hepmacprojb.local/model_epoch_4990.pt'
-  #batch_size = 1
+  batch_size = 1
   #batch_size = 128
   #batch_size = 4096
-  batch_size = 8192 # most used
+  #batch_size = 8192 # most used
   #batch_size = 16384 # crashes with memory issue
   test_batch_size = 8192
 
   epochs = 1000 * batch_size # Keeps number of updates on model constant
-  eval_epoch = 100
-  #eval_epoch = 1 
+  #eval_epoch = 100
+  eval_epoch = 1 
+
+  #epochs = 100
+  #eval_epoch = 10
 
   #device = "cpu"
   device = "cuda"
+
+  #train_filename = 'train_sample_run2.root'
+  #test_filename = 'test_sample_run2.root'
+  #test_full_filename = 'test_full_sample_run2.root'
+  #log_dir = None
+  #output_name = 'torch_nn'
+
+  #train_filename = 'train_sample_run2_0p05.root'
+  #test_filename = 'test_sample_run2_0p05.root'
+  #test_full_filename = 'test_full_sample_run2_0p05.root'
 
   do_test = False
   #do_test = True
@@ -943,8 +956,8 @@ if __name__ == "__main__":
   #output_name = f'nn_{log_dir}'.replace('/','_')
 
   #nvar = 12
-  nvar = 11
-  #nvar = 10
+  #nvar = 11
+  nvar = 10
   #nvar = 9
 
   use_weight_in_loss = False
@@ -1077,15 +1090,15 @@ if __name__ == "__main__":
 
 
   if use_full_window:
-    train_filename = 'mva_input_ntuples/train_sample_run2_lumi_winfull.root'
-    test_filename = 'mva_input_ntuples/test_sample_run2_lumi_winfull.root'
-    test_full_filename = 'mva_input_ntuples/test_full_sample_run2_lumi_winfull.root'
+    train_filename = 'train_sample_run2_lumi_winfull.root'
+    test_filename = 'test_sample_run2_lumi_winfull.root'
+    test_full_filename = 'test_full_sample_run2_lumi_winfull.root'
     log_dir = None
     output_name = 'torch_nn_winfull_decorH'
   else:
-    train_filename = 'mva_input_ntuples/train_sample_run2_lumi.root'
-    test_filename = 'mva_input_ntuples/test_sample_run2_lumi.root'
-    test_full_filename = 'mva_input_ntuples/test_full_sample_run2_lumi.root'
+    train_filename = 'train_sample_run2_lumi.root'
+    test_filename = 'test_sample_run2_lumi.root'
+    test_full_filename = 'test_full_sample_run2_lumi.root'
     log_dir = None
     output_name = 'torch_nn'
 
@@ -1124,21 +1137,24 @@ if __name__ == "__main__":
                         [0.41682249, 5.1650324],
                         [0., 396.69781],
                         ]
-  if nvar == 11:
-    feature_names = ['min_dR', 'pt_mass', 'pt_mass', 'cosTheta', 'costheta', 'phi',
-                     'photon_rapidity', 'l1_rapidity', 'l2_rapidity',
-                     'llg_flavor', 'llg_ptt']
-    normalize_max_min = [[0.40017,3.3237],
-                         [0.49768,4.1958],
-                         [0.13637,1.8901],
-                        [-0.99999,0.99992],
-                        [-0.98130,0.97890],
-                        [1.4860e-05,6.2832],
-                        [-2.4998,2.4999],
-                        [-2.5000,2.4999],
-                        [-2.4998,2.4998],
-                        [0., 1.],
-                        [0.00016470, 291.34]]
+  #if nvar == 11:
+  #  feature_names = ['photon_mva', 'min_dR', 'pt_mass', 'cosTheta', 'costheta', 
+  #                   #'photon_res', 
+  #                   'llg_mass_err',
+  #                   'photon_rapidity', 'l1_rapidity', 'l2_rapidity',
+  #                   'llg_flavor', 'gamma_pt']
+  #  normalize_max_min = [[-0.57861328125,0.98583984375],
+  #                      [0.400207489729,3.32512640953],
+  #                      [0.000612989999354,4.14180803299],
+  #                      [-0.999573588371,0.998835206032],
+  #                      [-0.987939178944,0.983025610447],
+  #                      #[0.00963300466537,1.51448833942], # photon_res
+  #                      [0.53313,16.254], # llg_mass_err
+  #                      [-2.49267578125,2.4921875],
+  #                      [-2.49072265625,2.4814453125],
+  #                      [-2.49072265625,2.50830078125],
+  #                      [1., 2.],
+  #                      [15.015657, 295.22623]]
   elif nvar == 10:
     feature_names = ['photon_mva', 'min_dR', 'pt_mass', 'cosTheta', 'costheta', 
                      #'photon_res', 
@@ -1172,6 +1188,19 @@ if __name__ == "__main__":
                         [-2.49072265625,2.50830078125],
                         ]
 
+  #model.eval()
+  #with torch.no_grad():
+  #  print(model(torch.from_numpy(test_dataset.feature_array[0])))
+  #  print(model(torch.from_numpy(test_dataset.feature_array[1])))
+  #  print(model(torch.from_numpy(test_dataset.feature_array[2])))
+
+  #train_dataset = RootDataset(root_filename='ntuples_mva/TMVA_nn.root',
+  #                          tree_name = "dataset/TrainTree",
+  #                          features = feature_names,
+  #                          normalize = normalize_max_min,
+  #                          cut = '1',
+  #                          spectators = ['llg_mass', 'w_lumi'],
+  #                          class_branch = ['classID'])
   train_dataset = RootDataset(root_filename= train_filename,
                             tree_name = "train_tree",
                             features = feature_names,
@@ -1181,6 +1210,14 @@ if __name__ == "__main__":
                             class_branch = ['classID'])
   print(f'train entries: {len(train_dataset)}')
 
+  #test_dataset = RootDataset(root_filename='ntuples_mva/TMVA_nn.root',
+  #                          tree_name = "dataset/TestTree",
+  #                          features = feature_names,
+  #                          normalize = normalize_max_min,
+  #                          cut = '1',
+  #                          spectators = ['llg_mass', 'w_lumi'],
+  #                          class_branch = ['classID'], 
+  #                          entry_stop = len(train_dataset))
   test_dataset = RootDataset(root_filename= test_filename,
                             tree_name = "test_tree",
                             features = feature_names,
@@ -1192,6 +1229,13 @@ if __name__ == "__main__":
                             )
   print(f'test entries: {len(test_dataset)}')
 
+  #eval_dataset = RootDataset(root_filename='ntuples_mva/TMVA_nn.root',
+  #                          tree_name = "dataset/TestTree",
+  #                          features = feature_names,
+  #                          normalize = normalize_max_min,
+  #                          cut = '1',
+  #                          spectators = ['llg_mass', 'w_lumi'],
+  #                          class_branch = ['classID'])
   eval_dataset = RootDataset(root_filename=test_full_filename,
                             tree_name = "test_tree",
                             features = feature_names,
@@ -1221,12 +1265,36 @@ if __name__ == "__main__":
   train_eval_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=test_batch_size, shuffle=False)
   test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=test_batch_size, shuffle=False)
 
+  #with torch.no_grad():
+  #  model.eval()
+  #  nBatches = len(train_dataloader)
+  #  loss = 0.
+  #  for batch, (feature, label, spec) in enumerate(train_dataloader):
+  #    X, y = feature.to(device), torch.max(label,1)[1].to(device)
+  #    pred = model(X)
+  #    loss += calculate_loss(X, y, pred, spec, loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss).item()
+  #  print(f'train loss: {loss}')
+  #  loss /= nBatches
+  #  print(f'  train loss: {loss}')
+  #  loss = 0.
+  #  nBatches = len(test_dataloader)
+  #  for batch, (feature, label, spec) in enumerate(test_dataloader):
+  #    X, y = feature.to(device), torch.max(label,1)[1].to(device)
+  #    pred = model(X)
+  #    loss += calculate_loss(X, y, pred, spec, loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss).item()
+  #  print(f'test loss: {loss}')
+  #  loss /= nBatches
+  #  print(f'  test loss: {loss}')
+
   if do_fine_tune:
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
   else:
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
+
   start_time = time.time()
+  #epochs = 50
+  #test(train_dataloader, model, loss_fn, train_loss!=0)
   if do_test: epochs = 1
   for iEpoch in range(epochs):
     if iEpoch != 0 or do_test:
@@ -1236,7 +1304,7 @@ if __name__ == "__main__":
     if iEpoch % eval_epoch ==0:
       # Evaluate
       results = {'train': {}, 'test': {}}
-      filename = f'tmp_ntuples/evaluate_trainloss{train_loss}_nvar{nvar}.root'
+      filename = f'trash/evaluate_trainloss{train_loss}_nvar{nvar}.root'
       # Returns loss, sample arrays
       results['train'] = evaluate_sample(train_eval_dataloader, device, model, loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
       results['test'] = evaluate_sample(test_dataloader, device, model, test_loss_fn, use_weight_in_loss, use_res_in_loss, use_mass_in_loss)
@@ -1339,7 +1407,12 @@ if __name__ == "__main__":
 
 
   if do_test == False: 
-    filename = 'mva_output_ntuples/'+output_name
+    filename = 'ntuples_mva/'+output_name
+    #if do_fine_tune == 1: filename += 'fine_nn'
+    #elif do_fine_tune == 2: filename += 'torch_fine_nn' 
+    #else: filename += 'torch_nn'
+    #filename += loss_filename
+    #if batch_size != 1: filename +='_batch'+str(batch_size)
     filename += '.root'
     root_file = uproot.recreate(filename)
     root_file["test_tree"] = {'x_norm': test_feature_array, 'x': test_unnorm_feature_array, 'y': test_label_array, 'yhat': test_predict_array_nn, 'mass': test_mass_array, 'weight': test_weight_array}
@@ -1347,3 +1420,30 @@ if __name__ == "__main__":
     root_file["test_full_tree"] = {'x_norm': eval_feature_array, 'x': eval_unnorm_feature_array, 'y': eval_label_array, 'yhat': eval_predict_array_nn, 'mass': eval_mass_array, 'weight': eval_weight_array}
     print('Results saved to '+filename)
     writer.close()
+
+  #for iEvent, feats in enumerate(test_feature_array):
+  #  print('feat: '+','.join(str(x) for x in raw_test_feature_array[iEvent]))
+  #  print('normalized feat: '+','.join(str(x) for x in test_feature_array[iEvent]))
+  #  print('label: '+str(test_label_array[iEvent]))
+  #  print('predict nn: '+str(test_predict_array_nn[iEvent]))
+  #  print('predict bdt: '+str(test_predict_array_btree[iEvent]))
+  #  print('predict xgboost: '+str(test_predict_array_bdt[iEvent]))
+  #  if (iEvent==10): break
+
+  #fpr_nn, tpr_nn, threshold_nn = sklearn.metrics.roc_curve(test_label_array[:,nlabels-1], test_predict_array_nn)
+  #fpr_btree, tpr_btree, threshold_btree = sklearn.metrics.roc_curve(test_label_array[:,nlabels-1], test_predict_array_btree)
+  #fpr_bdt, tpr_bdt, threshold_bdt = sklearn.metrics.roc_curve(test_label_array[:,nlabels-1], test_predict_array_bdt)
+  ## ROC
+  #plt.figure()
+  #plt.plot(tpr_btree, fpr_btree, lw=2.5, label="Boosted tree, AUC = {:.1f}%".format(sklearn.metrics.auc(fpr_btree, tpr_btree)*100))
+  #plt.plot(tpr_bdt, fpr_bdt, lw=2.5, label="XGBoost, AUC = {:.1f}%".format(sklearn.metrics.auc(fpr_bdt, tpr_bdt)*100))
+  #plt.plot(tpr_nn, fpr_nn, lw=2.5, label="NN, AUC = {:.1f}%".format(sklearn.metrics.auc(fpr_nn, tpr_nn)*100))
+  #plt.xlabel(r'True positive rate')
+  #plt.ylabel(r'False positive rate')
+  ##plt.semilogy()
+  #plt.ylim(0.001,1)
+  #plt.xlim(0,1)
+  #plt.grid(True)
+  #plt.legend(loc='upper left')
+  #plt.savefig("plots/roc_higgsToZGamma_classifiers.pdf")
+  #print("Saved to plots/roc_higgsToZGamma_classifiers.pdf")
