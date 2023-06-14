@@ -63,6 +63,25 @@ float get_max_dr(RVec<float> photon_eta, RVec<float> photon_phi,
   return dr1 > dr2 ? dr1 : dr2;
 }
 
+float get_l1_pt(RVec<float> el_pt,
+    RVec<float> mu_pt, RVec<int> ll_lepid, 
+    RVec<int> ll_i1, RVec<int> ll_i2) {
+  if (ll_lepid[0]==11) {
+    return (el_pt[ll_i1[0]] > el_pt[ll_i2[0]]) ? el_pt[ll_i1[0]] : el_pt[ll_i2[0]];
+  }
+  return (mu_pt[ll_i1[0]] > mu_pt[ll_i2[0]]) ? mu_pt[ll_i1[0]] : mu_pt[ll_i2[0]];
+}
+
+float get_l2_pt(RVec<float> el_pt,
+    RVec<float> mu_pt,RVec<int> ll_lepid, 
+    RVec<int> ll_i1, RVec<int> ll_i2) {
+  if (ll_lepid[0]==11) {
+    return (el_pt[ll_i1[0]] > el_pt[ll_i2[0]]) ? el_pt[ll_i2[0]] : el_pt[ll_i1[0]];
+  }
+  return (mu_pt[ll_i1[0]] > mu_pt[ll_i2[0]]) ? mu_pt[ll_i2[0]] : mu_pt[ll_i1[0]];
+}
+
+
 float get_l1_rapidity(RVec<float> el_pt, RVec<float> el_eta, 
     RVec<float> mu_pt, RVec<float> mu_eta, RVec<int> ll_lepid, 
     RVec<int> ll_i1, RVec<int> ll_i2) {
@@ -97,6 +116,24 @@ float get_l2_phi(RVec<float> el_pt, RVec<float> el_phi,
     return (el_pt[ll_i1[0]] > el_pt[ll_i2[0]]) ? el_phi[ll_i2[0]] : el_phi[ll_i1[0]];
   }
   return (mu_pt[ll_i1[0]] > mu_pt[ll_i2[0]]) ? mu_phi[ll_i2[0]] : mu_phi[ll_i1[0]];
+}
+
+float get_l1_charge(RVec<float> el_pt, RVec<float> el_charge, 
+    RVec<float> mu_pt, RVec<float> mu_charge, RVec<int> ll_lepid, 
+    RVec<int> ll_i1, RVec<int> ll_i2) {
+  if (ll_lepid[0]==11) {
+    return (el_pt[ll_i1[0]] > el_pt[ll_i2[0]]) ? el_charge[ll_i1[0]] : el_charge[ll_i2[0]];
+  }
+  return (mu_pt[ll_i1[0]] > mu_pt[ll_i2[0]]) ? mu_charge[ll_i1[0]] : mu_charge[ll_i2[0]];
+}
+
+float get_l2_charge(RVec<float> el_pt, RVec<float> el_charge, 
+    RVec<float> mu_pt, RVec<float> mu_charge, RVec<int> ll_lepid, 
+    RVec<int> ll_i1, RVec<int> ll_i2) {
+  if (ll_lepid[0]==11) {
+    return (el_pt[ll_i1[0]] > el_pt[ll_i2[0]]) ? el_charge[ll_i2[0]] : el_charge[ll_i1[0]];
+  }
+  return (mu_pt[ll_i1[0]] > mu_pt[ll_i2[0]]) ? mu_charge[ll_i2[0]] : mu_charge[ll_i1[0]];
 }
 
 float get_mass_err(RVec<float> llphoton_l1_masserr, RVec<float> llphoton_l2_masserr, RVec<float> llphoton_ph_masserr) {
@@ -136,6 +173,24 @@ int get_year(unsigned int slot, const ROOT::RDF::RSampleInfo &id) {
   else if (id.Contains("2017/mc")) year = 2017;
   else if (id.Contains("2018/mc")) year = 2018;
   return year;
+}
+
+// Find gen photon from Higgs and compare with reconstructed photon
+float get_gen_z_mass(RVec<float> mc_id, RVec<float> mc_mass) {
+  for (unsigned imc = 0; imc < mc_id.size(); ++imc) {
+    if (mc_id[imc] != 23) continue;
+    return mc_mass[imc];
+  }
+  return -1.;
+}
+
+// Find gen photon from Higgs and compare with reconstructed photon
+float get_gen_h_mass(RVec<float> mc_id, RVec<float> mc_mass) {
+  for (unsigned imc = 0; imc < mc_id.size(); ++imc) {
+    if (mc_id[imc] != 25) continue;
+    return mc_mass[imc];
+  }
+  return -1.;
 }
 
 // Find gen photon from Higgs and compare with reconstructed photon
@@ -575,24 +630,40 @@ if __name__=='__main__':
              ('phi','llphoton_phi[0]'),
              ('photon_res','photon_pterr[0]/photon_pt[0]'),
              ('photon_res_e','photon_pterr[0]/(photon_pt[0]*cosh(photon_eta[0]))'),
-             ('photon_rapidity','photon_eta[0]'),
-             ('l1_rapidity','get_l1_rapidity(el_pt,el_eta,mu_pt,mu_eta,ll_lepid,ll_i1,ll_i2)'),
-             ('l2_rapidity','get_l2_rapidity(el_pt,el_eta,mu_pt,mu_eta,ll_lepid,ll_i1,ll_i2)'),
              ('decorr_photon_pt','photon_pt[0]-0.207*llphoton_m[0]'),
              ('photon_pt_mass','photon_pt[0]/llphoton_m[0]'),
-             ('llg_mass','llphoton_m[0]'),
-             ('llg_mass_err','get_mass_err(llphoton_l1_masserr,llphoton_l2_masserr,llphoton_ph_masserr)'),
-             ('llg_flavor', 'get_flavor(ll_lepid)'),
+
              ('gamma_pt', 'photon_pt[0]'),
-             ('llg_eta', 'llphoton_eta[0]'),
-             ('llg_phi', 'llphoton_phi[0]'),
-             ('llg_ptt', 'get_llg_ptt(photon_pt, photon_eta, photon_phi, llphoton_pt, llphoton_eta, llphoton_phi, ll_pt, ll_eta, ll_phi)'),
-             ('z_eta', 'll_eta[0]'),
-             ('z_phi', 'll_phi[0]'),
-             ('l1_phi', 'get_l1_phi(el_pt,el_phi,mu_pt,mu_phi,ll_lepid,ll_i1,ll_i2)'),
-             ('l2_phi', 'get_l2_phi(el_pt,el_phi,mu_pt,mu_phi,ll_lepid,ll_i1,ll_i2)'),
              ('gamma_eta', 'photon_eta[0]'),
              ('gamma_phi', 'photon_phi[0]'),
+             ('l1_pt','get_l1_pt(el_pt,mu_pt,ll_lepid,ll_i1,ll_i2)'),
+             ('l1_rapidity','get_l1_rapidity(el_pt,el_eta,mu_pt,mu_eta,ll_lepid,ll_i1,ll_i2)'),
+             ('l1_phi', 'get_l1_phi(el_pt,el_phi,mu_pt,mu_phi,ll_lepid,ll_i1,ll_i2)'),
+             ('l1_charge', 'get_l1_charge(el_pt,el_charge,mu_pt,mu_charge,ll_lepid,ll_i1,ll_i2)'),
+             ('l2_pt','get_l2_pt(el_pt,mu_pt,ll_lepid,ll_i1,ll_i2)'),
+             ('l2_rapidity','get_l2_rapidity(el_pt,el_eta,mu_pt,mu_eta,ll_lepid,ll_i1,ll_i2)'),
+             ('l2_phi', 'get_l2_phi(el_pt,el_phi,mu_pt,mu_phi,ll_lepid,ll_i1,ll_i2)'),
+             ('l2_charge', 'get_l2_charge(el_pt,el_charge,mu_pt,mu_charge,ll_lepid,ll_i1,ll_i2)'),
+             ('z_pt', 'll_pt[0]'),
+             ('z_eta', 'll_eta[0]'),
+             ('z_phi', 'll_phi[0]'),
+             ('z_mass', 'll_m[0]'),
+             ('z_flavor', 'll_lepid[0]'),
+             ('llg_pt', 'llphoton_pt[0]'),
+             ('llg_eta', 'llphoton_eta[0]'),
+             ('llg_phi', 'llphoton_phi[0]'),
+             ('llg_mass','llphoton_m[0]'),
+             ('llg_flavor', 'get_flavor(ll_lepid)'),
+
+             ('llg_mass_err','get_mass_err(llphoton_l1_masserr,llphoton_l2_masserr,llphoton_ph_masserr)'),
+             ('llg_l1_mass_err','llphoton_l1_masserr[0]'),
+             ('llg_l2_mass_err','llphoton_l2_masserr[0]'),
+             ('llg_ph_mass_err','llphoton_ph_masserr[0]'),
+             ('llg_ptt', 'get_llg_ptt(photon_pt, photon_eta, photon_phi, llphoton_pt, llphoton_eta, llphoton_phi, ll_pt, ll_eta, ll_phi)'),
+
+             ('gen_h_mass', 'get_gen_h_mass(mc_id, mc_mass)'),
+             ('gen_z_mass', 'get_gen_z_mass(mc_id, mc_mass)'),
+             ('photon_rapidity','photon_eta[0]'),
              ('gamma_pt_diff', 'get_gamma_pt_diff(photon_pt, photon_eta, photon_phi, mc_id, mc_status, mc_mom, mc_pt, mc_eta, mc_phi)'),
              ('gamma_eta_diff', 'get_gamma_eta_diff(photon_pt, photon_eta, photon_phi, mc_id, mc_status, mc_mom, mc_pt, mc_eta, mc_phi)'),
              ('gamma_phi_diff', 'get_gamma_phi_diff(photon_pt, photon_eta, photon_phi, mc_id, mc_status, mc_mom, mc_pt, mc_eta, mc_phi)'),
@@ -603,13 +674,19 @@ if __name__=='__main__':
              ('lep_minus_eta_diff', 'get_lep_minus_eta_diff(mu_pt, mu_eta, mu_phi, mu_charge, el_pt, el_eta, el_phi, el_charge, ll_lepid, ll_i1, ll_i2, llphoton_ill, mc_id, mc_status, mc_mom, mc_pt, mc_eta, mc_phi)'),
              ('lep_minus_phi_diff', 'get_lep_minus_phi_diff(mu_pt, mu_eta, mu_phi, mu_charge, el_pt, el_eta, el_phi, el_charge, ll_lepid, ll_i1, ll_i2, llphoton_ill, mc_id, mc_status, mc_mom, mc_pt, mc_eta, mc_phi)'),
              ]
-  branches = ('photon_mva','min_dR','max_dR','pt_mass','cosTheta','costheta',
-      'phi','photon_res','photon_res_e', 'photon_rapidity','l1_rapidity','l2_rapidity','decorr_photon_pt','photon_pt_mass','w_lumi', 'llg_mass', 'llg_mass_err', 'llg_flavor', 'gamma_pt',
-      'llg_eta', 'llg_phi', 'llg_ptt', 'z_eta', 'z_phi', 'l1_phi', 'l2_phi', 'gamma_eta', 'gamma_phi', 
-      'year', 'luminosity', 'w_lumiXyear', 
+  branches = ('photon_mva','min_dR','max_dR','pt_mass','cosTheta','costheta', 'phi',
+      'photon_res','photon_res_e', 'decorr_photon_pt','photon_pt_mass',
+      'gamma_pt', 'gamma_eta', 'gamma_phi',
+      'l1_pt', 'l1_rapidity', 'l1_phi', 'l1_charge',
+      'l2_pt', 'l2_rapidity', 'l2_phi', 'l2_charge',
+      'z_pt', 'z_eta', 'z_phi', 'z_mass', 'z_flavor',
+      'llg_pt', 'llg_eta', 'llg_phi', 'llg_mass', 'llg_flavor',
+      'llg_mass_err', 'llg_l1_mass_err', 'llg_l2_mass_err', 'llg_ph_mass_err', 'llg_ptt', 
+      'gen_z_mass', 'gen_h_mass', 'photon_rapidity',
       'gamma_pt_diff', 'gamma_eta_diff', 'gamma_phi_diff',
       'lep_plus_pt_diff', 'lep_plus_eta_diff', 'lep_plus_phi_diff',
-      'lep_minus_pt_diff', 'lep_minus_eta_diff', 'lep_minus_phi_diff',)
+      'lep_minus_pt_diff', 'lep_minus_eta_diff', 'lep_minus_phi_diff',
+      'w_lumi', 'year', 'luminosity', 'w_lumiXyear', )
   #define drmax, pt_mass, first index
   #make n-tuples
   #signal_files = '/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*GluGluHToZG*.root'
@@ -628,7 +705,7 @@ if __name__=='__main__':
     bkg_files.append(bkg_2_file)
   write_ntuples(signal_files,
       cuts,
-      'ntuples/train_decorr_sig_run2_lumi_diff.root',
+      'ntuples/train_decorr_sig_run2_lumi_diff_extravar.root',
       #'ntuples/train_decorr_sig_run2_lumi.root',
       #'ntuples/train_decorr_sig.root',
       defines,
@@ -636,7 +713,7 @@ if __name__=='__main__':
       branches)
   write_ntuples(bkg_files,
       cuts,
-      'ntuples/train_decorr_bak_run2_lumi_diff.root',
+      'ntuples/train_decorr_bak_run2_lumi_diff_extravar.root',
       #'ntuples/train_decorr_bak_run2_lumi.root',
       #'ntuples/train_decorr_bak.root',
       defines,
