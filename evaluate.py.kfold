@@ -22,7 +22,7 @@ def find_signal_fraction_thresholds(signal_fractions, tmva_chain, mass_name, mva
   mva_thresholds = mva_quantiles.tolist()
   return mva_thresholds
 
-def evaluate_roc(info_mvas, no_weight=False):
+def evaluate_roc(info_mvas, no_weight=False, full_mass_window=True):
   roc_infos = []
   # mva_info = {'train': {'x':, 'y':, 'yhat':, 'observable':, 'weight':}, 'test': {...}, 'name':}
   for mva_info in info_mvas:
@@ -34,7 +34,16 @@ def evaluate_roc(info_mvas, no_weight=False):
       # roc with weights probably not working due to negative weights.
       sample_weight = np.array(mva_info['test']['weight'])
       sample_weight[sample_weight<0] = 0.
-      fpr, tpr, threshold = sklearn.metrics.roc_curve(mva_info['test']['y'], mva_info['test']['yhat'], sample_weight=sample_weight)
+      if full_mass_window:
+        fpr, tpr, threshold = sklearn.metrics.roc_curve(mva_info['test']['y'], mva_info['test']['yhat'], sample_weight=sample_weight)
+      else:
+        # Cut on mass
+        mass = np.array(mva_info['test']['observable'])
+        mass_cut = (mass<130).__and__(mass>120)
+        y_array = np.array(mva_info['test']['y'])[mass_cut]
+        yhat_array = np.array(mva_info['test']['yhat'])[mass_cut]
+        sample_weight = sample_weight[mass_cut]
+        fpr, tpr, threshold = sklearn.metrics.roc_curve(y_array, yhat_array, sample_weight=sample_weight)
     name = mva_info['name']
     roc_infos.append([fpr, tpr, threshold, name])
     #print(f'fpr: {fpr}\ntpr: {tpr}\nthresh: {threshold}')
@@ -111,7 +120,7 @@ def load_kfold_tmva_eval_dict(train_test_filename, test_full_filename, mva_var_n
     'names': {'train_filename': train_test_filename, 'test_filename': train_test_filename, 'test_full_filename': test_full_filename,
     'train_tree': f'{dataset_name}/TrainTree', 'test_tree': f'{dataset_name}/TestTree', 'test_full_tree': 'test_full_tree',
     'y': 'classID', 
-    'x': ['photon_mva', 'min_dR', 'pt_mass', 'cosTheta', 'costheta', 'photon_res', 'photon_rapidity', 'l1_rapidity', 'l2_rapidity'], 
+    'x': ['min_dR', 'max_dR', 'pt_mass', 'cosTheta', 'costheta', 'phi', 'photon_rapidity', 'l1_rapidity', 'l2_rapidity', 'llg_flavor', 'llg_ptt'], 
     'yhat': mva_var_name, 'observable': 'llg_mass', 'weight': 'w_lumiXyear'}}
   return tmva
 
@@ -133,7 +142,7 @@ def load_mva_dict(filename, name):
     'names':{'train_filename': filename, 'test_filename': filename, 'test_full_filename': filename,
     'train_tree': 'train_tree', 'test_tree': 'test_tree', 'test_full_tree': 'test_full_tree',
     'y': 'y', 
-    'x': ['x[0]', 'x[1]', 'x[2]', 'x[3]','x[4]', 'x[5]','x[6]', 'x[7]', 'x[8]'], 
+    'x': ['x[0]', 'x[1]', 'x[2]', 'x[3]','x[4]', 'x[5]','x[6]', 'x[7]', 'x[8]', 'x[9]', 'x[10]'], 
     'yhat': 'yhat', 'observable': 'mass', 'weight': 'weight'}}
   mva_file.close()
   return mva
@@ -144,9 +153,12 @@ def normalize_hist(hist):
   hist.Scale(1/sum_weight)
 
 # Make plot of mva variable for signal/backgroundxtrain/test
-def evaluate_overtraining(info_mvas):
+def evaluate_overtraining(info_mvas, full_mass_window = True):
   # mva_info = {'train': {'x':, 'y':, 'yhat':, 'observable':, 'weight':}, 'test': {...}, 'name':, 'filename':, names: {'train_tree':, 'test_tree':, 'label':, 'yhat':, 'observable': 'weight':, 'x':}}
   for mva_info in info_mvas:
+    # Make cuts
+    cuts = '1'
+    if full_mass_window == False: cuts += f"&&{mva_info['names']['observable']}>120&&{mva_info['names']['observable']}<130"
     # Find min max of mva variable
     mva_max = np.amax([mva_info['train']['yhat'], mva_info['train']['yhat']])
     mva_min = np.amin([mva_info['train']['yhat'], mva_info['train']['yhat']])
@@ -155,15 +167,15 @@ def evaluate_overtraining(info_mvas):
     test_tree = test_root_file.Get(mva_info['names']['test_tree'])
     yhat_signal_test = ROOT.TH1F('signal_test', 'signal_test;mva', 25, mva_min, mva_max)
     yhat_bkg_test = ROOT.TH1F('bkg_test', 'bkg_test', 25, mva_min, mva_max)
-    test_tree.Draw(mva_info['names']['yhat']+'>>signal_test', mva_info['names']['y']+'==1', 'goff')
-    test_tree.Draw(mva_info['names']['yhat']+'>>bkg_test', mva_info['names']['y']+'==0', 'goff')
+    test_tree.Draw(mva_info['names']['yhat']+'>>signal_test', f"({mva_info['names']['y']}==1)&&{cuts}", 'goff')
+    test_tree.Draw(mva_info['names']['yhat']+'>>bkg_test', f"({mva_info['names']['y']}==0)&&{cuts}", 'goff')
     # Train tree
     train_root_file = ROOT.TFile(mva_info['names']['train_filename'])
     train_tree = train_root_file.Get(mva_info['names']['train_tree'])
     yhat_signal_train = ROOT.TH1F('signal_train', 'signal_train', 25, mva_min, mva_max)
     yhat_bkg_train = ROOT.TH1F('bkg_train', 'bkg_train', 25, mva_min, mva_max)
-    train_tree.Draw(mva_info['names']['yhat']+'>>signal_train', mva_info['names']['y']+'==1', 'goff')
-    train_tree.Draw(mva_info['names']['yhat']+'>>bkg_train', mva_info['names']['y']+'==0', 'goff')
+    train_tree.Draw(mva_info['names']['yhat']+'>>signal_train', f"({mva_info['names']['y']}==1)&&{cuts}", 'goff')
+    train_tree.Draw(mva_info['names']['yhat']+'>>bkg_train', f"({mva_info['names']['y']}==0)&&{cuts}", 'goff')
     # Normalize
     normalize_hist(yhat_signal_test)
     normalize_hist(yhat_bkg_test)
@@ -500,13 +512,13 @@ def evaluate_correlation(info_mvas, draw=True, tree_type='test_tree'):
     signal_fractions = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
     mva_thresholds = find_signal_fraction_thresholds(signal_fractions, tmva_chain, mass_name, mva_name, label_name, weight_name)
     mva_max = tmva_chain.GetMaximum(mva_name)
-    mva_thresholds.append(mva_max)
+    mva_thresholds.append(mva_max) # Add last bin
     # Make mass histograms with thresholds
     mva_hists = {}
     signal_hists = {}
     ROOT.gStyle.SetOptStat(0)
     #print(f'mva_thresholds: {mva_thresholds}')
-    # Find min mva
+    # Make background and signal hists
     for imva, mva_threshold in enumerate(mva_thresholds):
       # Background hists
       hist = ROOT.TH1F("hist_"+str(mva_threshold),"hist_"+str(mva_threshold),160,100,180)
@@ -524,6 +536,7 @@ def evaluate_correlation(info_mvas, draw=True, tree_type='test_tree'):
       if sum_weight != 0:
         hist.Scale(1/sum_weight)
         mva_hists[mva_threshold] = hist
+
       # Signal hists
       signal_hist = ROOT.TH1F("signal_hist_"+str(mva_threshold),"signal_hist_"+str(mva_threshold),160,100,180)
       if imva == 0:
@@ -541,6 +554,8 @@ def evaluate_correlation(info_mvas, draw=True, tree_type='test_tree'):
       if sum_weight != 0:
         signal_hist.Scale(1/sum_weight)
         signal_hists[mva_threshold] = signal_hist
+
+    # Find std_dev of histograms
     # Get values of histogram bin. 1 is first bin, nbin is last bin
     #print(mva_hists[mva_thresholds[0]].GetNbinsX())
     std_values = []
@@ -557,6 +572,7 @@ def evaluate_correlation(info_mvas, draw=True, tree_type='test_tree'):
       std_values.append(stdev)
     #print(mva_tag+" mean stdev: "+str(np.mean(std_values)))
     std_divs.append(np.mean(std_values))
+
     if draw:
       # background
       c1 = rootutils.new_canvas()
@@ -787,16 +803,170 @@ def add_kfold_mva(mva_output_folder, mva_filename_base, mva_name, num_kfold, inf
   for iseed in range(num_kfold):
     info_mvas.append(load_mva_dict(f'{mva_output_folder}/{mva_filename_base}_s{iseed+1}.root', f'{mva_name}_s{iseed+1}'))
 
+def evaluate_inputs(info_mvas, input_names, tree_type='test_full_tree'):
+  for mva_info in info_mvas:
+    if tree_type == 'train_tree': tmva_filename = mva_info['names']['train_filename']
+    elif tree_type == 'test_full_tree': tmva_filename = mva_info['names']['test_full_filename']
+    else: tmva_filename = mva_info['names']['test_filename']
+    tree_name = mva_info['names'][tree_type]
+    mass_name = mva_info['names']['observable']
+    label_name = mva_info['names']['y']
+    mva_name = mva_info['names']['yhat']
+    mva_tag = mva_info['name']
+    weight_name = mva_info['names']['weight']
+
+    tmva_chain = ROOT.TChain(tree_name)
+    tmva_chain.Add(tmva_filename)
+    # Find mva thresholds
+    signal_fractions = [0.8, 0.6, 0.4, 0.2]
+    mva_thresholds = find_signal_fraction_thresholds(signal_fractions, tmva_chain, mass_name, mva_name, label_name, weight_name)
+    mva_max = tmva_chain.GetMaximum(mva_name)
+    mva_thresholds.append(mva_max) # Add last bin
+    # Make input histograms with thresholds
+    for iname, input_name in enumerate(mva_info['names']['x']):
+      # Make input histograms with thresholds
+      bkg_hists = {}
+      signal_hists = {}
+      ROOT.gStyle.SetOptStat(0)
+      # Get min and max value for input
+      hist = ROOT.TH1F("hist","hist",30,-1,-1)
+      tmva_chain.Draw(f"{input_name}>>hist",'1',"goff")
+      input_min = hist.GetXaxis().GetXmin()
+      input_max = hist.GetXaxis().GetXmax()
+      #print(f'input_name: {input_name} input_min: {input_min}, input_max: {input_max}')
+      # Make background and signal hists
+      for imva, mva_threshold in enumerate(mva_thresholds):
+        # Background hists
+        hist = ROOT.TH1F("hist_"+str(mva_threshold),"hist_"+str(mva_threshold),30,input_min,input_max)
+        if imva == 0:
+          entries = tmva_chain.Draw(input_name+">>hist_"+str(mva_threshold),f'{label_name}==0&&{mva_name}<{mva_threshold}',"goff")
+          #print(f"{input_name}>>hist_{mva_threshold}  {label_name}==0&&{mva_name}<{mva_threshold}  {entries}")
+        elif imva == len(mva_thresholds)-1:
+          entries = tmva_chain.Draw(input_name+">>hist_"+str(mva_threshold),f'{label_name}==0&&{mva_name}>{mva_threshold}',"goff")
+          #print(f'{label_name}==0&&{mva_name}>{prev_mva_threshold}, {entries}')
+        else:
+          entries = tmva_chain.Draw(input_name+">>hist_"+str(mva_threshold),f'{label_name}==0&&{mva_name}<{mva_threshold}&&{mva_name}>{prev_mva_threshold}',"goff")
+          #print(f'{label_name}==0&&{mva_name}<{mva_threshold}&&{mva_name}>{prev_mva_threshold}, {entries}')
+        # Normalize histogram
+        sum_weight = hist.GetSumOfWeights()
+        if sum_weight != 0:
+          hist.Scale(1/sum_weight)
+          bkg_hists[mva_threshold] = hist
+
+        # Signal hists
+        signal_hist = ROOT.TH1F("signal_hist_"+str(mva_threshold),"signal_hist_"+str(mva_threshold),30,input_min,input_max)
+        if imva == 0:
+          #print(f'{label_name}==1&&{mva_name}<{mva_threshold}')
+          entries = tmva_chain.Draw(input_name+">>signal_hist_"+str(mva_threshold),f'{label_name}==1&&{mva_name}<{mva_threshold}',"goff")
+        elif imva == len(mva_thresholds)-1:
+          #print(f'{label_name}==1&&{mva_name}>{prev_mva_threshold}')
+          entries = tmva_chain.Draw(input_name+">>signal_hist_"+str(mva_threshold),f'{label_name}==1&&{mva_name}>{mva_threshold}',"goff")
+        else:
+          #print(f'{label_name}==1&&{mva_name}<{mva_threshold}&&{mva_name}>{prev_mva_threshold}')
+          entries = tmva_chain.Draw(input_name+">>signal_hist_"+str(mva_threshold),f'{label_name}==1&&{mva_name}<{mva_threshold}&&{mva_name}>{prev_mva_threshold}',"goff")
+        prev_mva_threshold = mva_threshold
+        # Normalize histogram
+        sum_weight = signal_hist.GetSumOfWeights()
+        if sum_weight != 0:
+          signal_hist.Scale(1/sum_weight)
+          signal_hists[mva_threshold] = signal_hist
+
+      # Draw hists
+      # background
+      c1 = rootutils.new_canvas()
+      legend = ROOT.TLegend(0.7, 0.7, 0.9, 0.98)
+      bkg_hist = ROOT.TH1F("bkg_hist",f"Background dist.;{input_names[iname]}",30,input_min,input_max)
+      bkg_hist.Draw()
+      colors = [ROOT.kGreen-8, ROOT.kGreen-5, ROOT.kGreen+4,
+                ROOT.kBlue-10, ROOT.kBlue-7, ROOT.kBlue,
+                ROOT.kRed-10, ROOT.kRed-7, ROOT.kRed,]
+      colors = [1,2,3,4,6,7,8,9,46,49,41,38]
+      for imva, mva_threshold in enumerate(bkg_hists):
+        hist = bkg_hists[mva_threshold]
+        hist.SetLineColor(colors[imva])
+        hist.Draw('same hist')
+        legend.AddEntry(hist)
+      legend.Draw()
+      rootutils.set_max_th1()
+      c1.SaveAs(f"plots/{input_names[iname]}_bkg_hist_mva_{rootutils.slugify(mva_tag)}.pdf")
+
+      # signal
+      c2 = rootutils.new_canvas()
+      legend = ROOT.TLegend(0.7, 0.7, 0.9, 0.98)
+      signal_hist = ROOT.TH1F(f"signal_hist",f"Signal dist.;{input_names[iname]}",30,input_min,input_max)
+      signal_hist.Draw('hist')
+      for imva, mva_threshold in enumerate(signal_hists):
+        hist = signal_hists[mva_threshold]
+        hist.SetLineColor(colors[imva])
+        hist.Draw('same hist')
+        legend.AddEntry(hist)
+      legend.Draw()
+      rootutils.set_max_th1()
+      c2.SaveAs(f"plots/{input_names[iname]}_signal_hist_mva_{rootutils.slugify(mva_tag)}.pdf")
+      ROOT.gStyle.SetOptStat(1)
+
+def draw_inputs(info_mvas, input_names, tree_type='test_full_tree'):
+  for mva_info in info_mvas:
+    if tree_type == 'train_tree': tmva_filename = mva_info['names']['train_filename']
+    elif tree_type == 'test_full_tree': tmva_filename = mva_info['names']['test_full_filename']
+    else: tmva_filename = mva_info['names']['test_filename']
+    tree_name = mva_info['names'][tree_type]
+    mass_name = mva_info['names']['observable']
+    label_name = mva_info['names']['y']
+    mva_name = mva_info['names']['yhat']
+    mva_tag = mva_info['name']
+    weight_name = mva_info['names']['weight']
+
+    tmva_chain = ROOT.TChain(tree_name)
+    tmva_chain.Add(tmva_filename)
+
+    # Make input histograms with thresholds
+    for iname, input_name in enumerate(mva_info['names']['x']):
+      ROOT.gStyle.SetOptStat(0)
+
+      # Get min and max value for input
+      hist = ROOT.TH1F("hist","hist",30,-1,-1)
+      tmva_chain.Draw(f"{input_name}>>hist",'1',"goff")
+      input_min = hist.GetXaxis().GetXmin()
+      input_max = hist.GetXaxis().GetXmax()
+      #print(f'input_name: {input_name} input_min: {input_min}, input_max: {input_max}')
+
+      # Make background and signal hists
+      # Background hists
+      bkg_hist = ROOT.TH1F("hist_bkg","hist_bkg",30,input_min,input_max)
+      entries = tmva_chain.Draw(input_name+">>hist_bkg",f'{label_name}==0',"goff")
+      # Normalize histogram
+      sum_weight = bkg_hist.GetSumOfWeights()
+      bkg_hist.Scale(1/sum_weight)
+
+      # Signal hists
+      signal_hist = ROOT.TH1F("signal_hist","signal_hist",30,input_min,input_max)
+      entries = tmva_chain.Draw(input_name+">>signal_hist",f'{label_name}==1',"goff")
+      # Normalize histogram
+      sum_weight = signal_hist.GetSumOfWeights()
+      signal_hist.Scale(1/sum_weight)
+      signal_hist.SetLineColor(ROOT.kRed)
+
+      c1 = rootutils.new_canvas()
+      blank_hist = ROOT.TH1F('blank_hist',f"{input_names[iname]}", 30, input_min, input_max)
+      blank_hist.Draw()
+      signal_hist.Draw("same hist E1")
+      bkg_hist.Draw("same hist E1")
+      legend = ROOT.TLegend(0.7, 0.9, 0.9, 0.98)
+      legend.AddEntry(signal_hist)
+      legend.AddEntry(bkg_hist)
+      legend.Draw()
+      rootutils.set_max_th1()
+      c1.SaveAs(f'plots/hist_{input_names[iname]}.pdf')
+
 if __name__ == "__main__":
 
-  info_mvas = []
-  #add_kfold_mva(mva_output_folder='mva_output_ntuples', mva_filename_base='xgbdt_wequal_run2', mva_name='xgbdt eq. w', num_kfold=3, info_mvas=info_mvas)
-  #add_kfold_mva(mva_output_folder='mva_output_ntuples', mva_filename_base='xgbdt_run2_decorr_shape', mva_name='xgbdt shape w', num_kfold=3, info_mvas=info_mvas)
-  add_kfold_mva(mva_output_folder='mva_output_ntuples', mva_filename_base='nn_loss6_run2', mva_name='nn eq. w', num_kfold=1, info_mvas=info_mvas)
-
   # Load data
-  #xgbdt_decorr = load_mva_dict('mva_output_ntuples/xgbdt_run2_decorr.root', 'xgbdt decorr')
-
+  info_mvas = []
+  #add_kfold_mva(mva_output_folder='mva_output_ntuples', mva_filename_base='xgbdt_wequal_run2', mva_name='xgbdt eq. w', num_kfold=1, info_mvas=info_mvas)
+  add_kfold_mva(mva_output_folder='mva_output_ntuples', mva_filename_base='xgbdt_wequal_run2', mva_name='xgbdt eq. w', num_kfold=3, info_mvas=info_mvas)
+  add_kfold_mva(mva_output_folder='mva_output_ntuples', mva_filename_base='xgbdt_run2_decorr_shape', mva_name='xgbdt shape w', num_kfold=3, info_mvas=info_mvas)
+  add_kfold_mva(mva_output_folder='mva_output_ntuples', mva_filename_base='nn_loss6_run2', mva_name='nn eq. w', num_kfold=3, info_mvas=info_mvas)
   print('Loaded dicts')
 
   # To check overtraining
@@ -809,4 +979,9 @@ if __name__ == "__main__":
   evaluate_overtraining(info_mvas)
   evaluate_significance_bins_with_resolution(info_mvas, tree_type='test_full_tree')
   evaluate_tprfpr(info_mvas, tree_type='test_full_tree')
+  evaluate_inputs(info_mvas, input_names=['min_dR', 'max_dR', 'pt_mass', 'cosTheta', 'costheta', 'phi', 'photon_rapidity', 'l1_rapidity', 'l2_rapidity', 'llg_flavor', 'llg_ptt'], tree_type='test_full_tree')
   evaluate_correlation(info_mvas, tree_type='test_full_tree')
+
+  #evaluate_roc(info_mvas,full_mass_window=False) # negative weights set to 0
+  #evaluate_overtraining(info_mvas, full_mass_window=False)
+  #draw_inputs(info_mvas, input_names=['min_dR', 'max_dR', 'pt_mass', 'cosTheta', 'costheta', 'phi', 'photon_rapidity', 'l1_rapidity', 'l2_rapidity', 'llg_flavor', 'llg_ptt'])

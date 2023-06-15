@@ -24,26 +24,26 @@ from train_nn import unnormalize
 import argparse
 
 if __name__ == "__main__":
-  # Make options for kfold
-  parser = argparse.ArgumentParser(description='Train tmva')
-  parser.add_argument('-s','--kfold_seed', required=False, help='kfold seed for training', default=None)
-  parser.add_argument('-t','--tag', required=False, help='tag', default='')
-  args = parser.parse_args()
-
   kfold_directory = 'kfold_ntuples'
   use_full_window = True
 
   device = "cpu"
   torch.manual_seed(1)
 
-  #model_filename = 'runs/Jun12_02-44-05_cms37/model_epoch_2400.pt' # loss6
-  #eval_filename = 'mva_output_ntuples/nn_loss6_run2.root'
+  #kfold_seed = 1
+  #model_filename = 'runs/2023_06_15_14-22-29_scaled_bce_loss_s1/model_epoch_30.pt' # loss6_s1
+  #eval_filename = f'mva_output_ntuples/nn_loss6_run2_s{kfold_seed}.root'
   #nvar = 11
 
-  model_filename = 'runs/Jun15_13-50-15_hepmacprojb.local/model_epoch_3.pt' # loss6_s1
-  eval_filename = f'mva_output_ntuples/nn_loss6_run2_s{args.kfold_seed}.root'
-  nvar = 11
+  #kfold_seed = 2
+  #model_filename = 'runs/2023_06_15_14-24-09_scaled_bce_loss_s2/model_epoch_30.pt' # loss6_s1
+  #eval_filename = f'mva_output_ntuples/nn_loss6_run2_s{kfold_seed}.root'
+  #nvar = 11
 
+  kfold_seed = 3
+  model_filename = 'runs/2023_06_15_14-24-19_scaled_bce_loss_s3/model_epoch_30.pt' # loss6_s1
+  eval_filename = f'mva_output_ntuples/nn_loss6_run2_s{kfold_seed}.root'
+  nvar = 11
 
   state_dict = torch.load(model_filename)
   model = SimpleNetwork(input_size=nvar, hidden_size=nvar*4, output_size=1).to(device)
@@ -118,8 +118,8 @@ if __name__ == "__main__":
                         [-2.49072265625,2.50830078125],
                         ]
 
-  if use_full_window: input_filename = f'{kfold_directory}/kfold_sample_run2_lumi_winfull_s{args.kfold_seed}.root'
-  else: input_filename = f'{kfold_directory}/kfold_sample_run2_lumi_s{args.kfold_seed}.root'
+  if use_full_window: input_filename = f'{kfold_directory}/kfold_sample_run2_lumi_winfull_s{kfold_seed}.root'
+  else: input_filename = f'{kfold_directory}/kfold_sample_run2_lumi_s{kfold_seed}.root'
   print(f'Input: {input_filename}')
 
   train_dataset = RootDataset(root_filename=input_filename,
