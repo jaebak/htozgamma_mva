@@ -92,17 +92,24 @@ if __name__ == '__main__':
     train_sample_filename = 'mva_input_ntuples/train_sample_run2_lumi.root'
     test_sample_filename = 'mva_input_ntuples/test_sample_run2_lumi.root'
     test_full_sample_filename = 'mva_input_ntuples/test_full_sample_run2_lumi.root'
+  sample_filename = 'mva_input_ntuples/full_sample_run2_lumi.root'
 
 
   np.random.seed(1)
+  # Combine signal and bkg for full sample. Randomizes events between signal and bkg.
+  combine_signal_bkg(bkg_filename = input_bkg_filename, bkg_treename = 'tree',
+    signal_filename = input_signal_filename, signal_treename = 'tree',
+    cut = '1',
+    out_filename = sample_filename, out_treename = 'tree')
+
   # Create training and test sample. Randomize events between training and testing. Scales up weights.
   # weight index starts from 0
   split_ntuple( in_filename = input_signal_filename, in_treename = 'tree', 
     cut = '1',
-    train_fraction = 0.8, weight_branch_name = 'w_lumiXyear', out_filename = split_signal_filename)
+    train_fraction = 0.7, weight_branch_name = 'w_lumiXyear', out_filename = split_signal_filename)
   split_ntuple( in_filename = input_bkg_filename, in_treename = 'tree',
     cut = '1',
-    train_fraction = 0.8, weight_branch_name = 'w_lumiXyear', out_filename = split_bkg_filename)
+    train_fraction = 0.7, weight_branch_name = 'w_lumiXyear', out_filename = split_bkg_filename)
 
   if full_mass_window: cut = '1'
   else: cut = '(llg_mass>120) & (llg_mass<130)'

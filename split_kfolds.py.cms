@@ -75,19 +75,17 @@ def split_ntuple(in_filename, in_treename, random_seed, cut, train_fraction, wei
 
 if __name__ == '__main__':
 
-  window_cut = True
-
-  in_filename = 'mva_input_ntuples/full_sample_run2_lumi.root'
-  in_treename = 'tree'
+  in_filename = 'train_sample_run2_lumi_winfull.root'
+  in_treename = 'train_tree'
   in_weightname = 'w_lumiXyear'
   train_fraction = 0.7
-  num_kfolds = 3
-  if window_cut: train_cut = '(llg_mass>120) & (llg_mass<130)'
-  else: train_cut = '1'
-  if window_cut: output_base_filename = 'kfold_sample_run2_lumi'
-  else:output_base_filename = 'kfold_sample_run2_lumi_winfull'
+  num_kfolds = 10
+  train_cut = '(llg_mass>120) & (llg_mass<130)'
+  output_base_filename = 'train_sample_run2_lumi'
+  #train_cut = '1'
+  #output_filename = 'train_sample_run2_lumi_winfull'
 
   for ifold in range(num_kfolds):
     random_seed = ifold+1
-    output_filename = f'kfold_ntuples/{output_base_filename}_s{random_seed}.root'
+    output_filename = f'ntuples_kfold/{output_base_filename}_s{random_seed}.root'
     split_ntuple(in_filename, in_treename, random_seed, train_cut, train_fraction, in_weightname, output_filename)

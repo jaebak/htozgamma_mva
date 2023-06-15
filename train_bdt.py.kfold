@@ -7,48 +7,50 @@ import xgboost
 from RootDataset import RootDataset
 import uproot
 import numpy as np
+import argparse
 
 if __name__ == '__main__':
+  # Make options for kfold
+  parser = argparse.ArgumentParser(description='Train tmva')
+  parser.add_argument('-s','--kfold_seed', required=False, help='kfold seed for training', default=None)
+  parser.add_argument('-t','--tag', required=False, help='tag', default='')
+  args = parser.parse_args()
+
+  kfold_directory = 'kfold_ntuples'
 
   # weight_types: 1 is decorr, 2 is use weight, 3 is weight equally, 4 is only shape decorr, 5 is no weight
-  weight_type = 3
+  weight_type = 4
 
   feature_names = ['min_dR', 'max_dR', 'pt_mass', 'cosTheta', 'costheta', 'phi',
                    'photon_rapidity', 'l1_rapidity', 'l2_rapidity',
                    'llg_flavor', 'llg_ptt'
                    ]
 
-  use_full_mass_windows = False
+  use_full_mass_windows = True
   use_weight = True
   if weight_type == 1:
     use_full_mass_windows = True
-    gbdt_filename = 'mva_output_ntuples/gbdt_run2_decorr.root'
-    xgbt_filename = 'mva_output_ntuples/xgbdt_run2_decorr.root'
+    xgbt_filename = f'mva_output_ntuples/xgbdt_run2_decorr{args.tag}_s{args.kfold_seed}.root'
   elif weight_type == 2:
-    gbdt_filename = 'mva_output_ntuples/gbdt_run2.root'
-    xgbt_filename = 'mva_output_ntuples/xgbdt_run2.root'
+    xgbt_filename = f'mva_output_ntuples/xgbdt_run2{args.tag}_s{args.kfold_seed}.root'
   elif weight_type == 3:
-    gbdt_filename = 'mva_output_ntuples/gbdt_wequal_run2.root'
-    xgbt_filename = 'mva_output_ntuples/xgbdt_wequal_run2.root'
+    xgbt_filename = f'mva_output_ntuples/xgbdt_wequal_run2{args.tag}_s{args.kfold_seed}.root'
   elif weight_type == 4:
     use_full_mass_windows = True
-    gbdt_filename = 'mva_output_ntuples/gbdt_run2_decorr_shape.root'
-    xgbt_filename = 'mva_output_ntuples/xgbdt_run2_decorr_shape.root'
+    xgbt_filename = f'mva_output_ntuples/xgbdt_run2_decorr_shape{args.tag}_s{args.kfold_seed}.root'
   elif weight_type == 5:
-    gbdt_filename = 'mva_output_ntuples/gbdt_run2_noweight.root'
-    xgbt_filename = 'mva_output_ntuples/xgbdt_run2_noweight.root'
+    xgbt_filename = f'mva_output_ntuples/xgbdt_run2_noweight{args.tag}_s{args.kfold_seed}.root'
     use_weight = False
 
-  if use_full_mass_windows:
-    train_filename = 'mva_input_ntuples/train_sample_run2_lumi_winfull.root'
-    test_filename = 'mva_input_ntuples/test_sample_run2_lumi_winfull.root'
-    test_full_filename = 'mva_input_ntuples/test_full_sample_run2_lumi_winfull.root'
-  else:
-    train_filename = 'mva_input_ntuples/train_sample_run2_lumi.root'
-    test_filename = 'mva_input_ntuples/test_sample_run2_lumi.root'
-    test_full_filename = 'mva_input_ntuples/test_full_sample_run2_lumi.root'
 
-  train_dataset = RootDataset(root_filename= train_filename,
+  # Setup input samples
+  if use_full_mass_windows:
+    input_filename = f'{kfold_directory}/kfold_sample_run2_lumi_winfull_s{args.kfold_seed}.root'
+  else:
+    input_filename = f'{kfold_directory}/kfold_sample_run2_lumi_s{args.kfold_seed}.root'
+
+
+  train_dataset = RootDataset(root_filename= input_filename,
                             tree_name = "train_tree",
                             features = feature_names,
                             cut = '1',
@@ -90,7 +92,7 @@ if __name__ == '__main__':
   else: xgbdt_classifier.fit(train_feature_array, train_hot_label_array[:,nlabels-1])
 
   # Evaluate
-  test_dataset = RootDataset(root_filename=test_filename,
+  test_dataset = RootDataset(root_filename=input_filename,
                             tree_name = "test_tree",
                             features = feature_names,
                             cut = '1',
@@ -105,8 +107,8 @@ if __name__ == '__main__':
   test_weight_array = test_dataset.spec_array[:,1]
   nlabels = test_label_array.shape
 
-  eval_dataset = RootDataset(root_filename=test_full_filename,
-                            tree_name = "test_tree",
+  eval_dataset = RootDataset(root_filename=input_filename,
+                            tree_name = "test_full_tree",
                             features = feature_names,
                             cut = '1',
                             spectators = ['llg_mass', 'w_lumiXyear'],
@@ -122,7 +124,6 @@ if __name__ == '__main__':
 
   train_weight_array = train_dataset.spec_array[:,2]
 
-  # xgboost
   # Predict
   test_predict_array_xgbdt_raw = xgbdt_classifier.predict_proba(test_feature_array)
   test_predict_array_xgbdt = test_predict_array_xgbdt_raw[:,1]

@@ -6,7 +6,14 @@ import ROOT
 ROOT.gROOT.SetBatch(ROOT.kTRUE)
 import rootutils
 
-def write_ntuples(filenames, cuts, out_name, defines=[], tree_name='tree', branches=()):
+def get_entries(filenames, tree_name):
+  chain = ROOT.TChain(tree_name)
+  for filename in filenames:
+    chain.Add(filename) 
+  return chain.GetEntries()
+  
+
+def write_ntuples(filenames, cuts, out_name, defines=[], tree_name='tree', branches=(), entries=1):
   '''Generate ROOT n-tuple from existing n-tuple
   
   Parameters:
@@ -24,8 +31,10 @@ def write_ntuples(filenames, cuts, out_name, defines=[], tree_name='tree', branc
   df = ROOT.RDataFrame('tree',filenames_vec)
   for define in defines:
     df = df.Define(define[0],define[1])
-  df = df.DefinePerSample("luminosity", "get_luminosity(rdfslot_, rdfsampleinfo_)")
-  df = df.DefinePerSample("year", "get_year(rdfslot_, rdfsampleinfo_)")
+  df = df.Define("entries", f'return {entries};')
+  df = df.Define("luminosity", f'return 137.5;')
+  df = df.DefinePerSample("cross_section", "get_cross_section(rdfslot_, rdfsampleinfo_)")
+  df = df.Define("w_lumi", "cross_section / entries")
   df = df.Define("w_lumiXyear", "w_lumi * luminosity")
   for cut in cuts:
     df = df.Filter(cut)
@@ -120,13 +129,15 @@ float get_llg_ptt(RVec<float> photon_pt, RVec<float> photon_eta, RVec<float> pho
 }
 
 float get_luminosity(unsigned int slot, const ROOT::RDF::RSampleInfo &id) {
-  float luminosity = 0;
-  if (id.Contains("2016APV/mc")) luminosity = 16.8;
-  else if (id.Contains("2016/mc"))  luminosity = 19.5;
-  else if (id.Contains("2017/mc")) luminosity = 41.48;
-  else if (id.Contains("2018/mc")) luminosity = 59.83;
-  //cout<<id.AsString()<<" "<<luminosity<<endl;
+  float luminosity = 137.5;
   return luminosity;
+}
+
+float get_cross_section(unsigned int slot, const ROOT::RDF::RSampleInfo &id) {
+  float w_lumi = 0;
+  if (id.Contains("HToZG")) w_lumi = 48.58 * 0.001533 * 0.100974 * 1000; // xs * H->ZG * Z->LL * pb to fb
+  else if (id.Contains("_ZG"))  w_lumi = 55.48 * 1000; // xs * pb to fb
+  return w_lumi;
 }
 
 int get_year(unsigned int slot, const ROOT::RDF::RSampleInfo &id) {
@@ -137,512 +148,72 @@ int get_year(unsigned int slot, const ROOT::RDF::RSampleInfo &id) {
   else if (id.Contains("2018/mc")) year = 2018;
   return year;
 }
-
-// Find gen photon from Higgs and compare with reconstructed photon
-float get_gamma_pt_diff(RVec<float> photon_pt, RVec<float> photon_eta, RVec<float> photon_phi,
-     RVec<float> mc_id, RVec<float> mc_status, RVec<float> mc_mom, RVec<float> mc_pt, RVec<float> mc_eta, RVec<float> mc_phi) {
-  //float dr = -999;
-  float dpt = -999;
-  float gamma_pt = photon_pt[0];
-  float gamma_eta = photon_eta[0];
-  float gamma_phi = photon_phi[0];
-  for (unsigned imc = 0; imc < mc_id.size(); ++imc) {
-    // Require photon to be final state and from Higgs
-    if (mc_id[imc] != 22) continue;
-    if (mc_status[imc] != 1) continue; 
-    if (mc_mom[imc] != 25) continue;
-    //float deta = gamma_eta - mc_eta[imc];
-    //float dphi = TVector2::Phi_mpi_pi(gamma_phi - mc_phi[imc]);
-    //dr = TMath::Sqrt(deta*deta + dphi*dphi);
-    dpt = gamma_pt - mc_pt[imc];
-    break;
-  }
-  // Limit dpt
-  if (dpt>10) dpt = 10;
-  if (dpt<-10) dpt = -10;
-  return dpt;
-}
-
-// Find gen photon from Higgs and compare with reconstructed photon
-float get_gamma_eta_diff(RVec<float> photon_pt, RVec<float> photon_eta, RVec<float> photon_phi,
-     RVec<float> mc_id, RVec<float> mc_status, RVec<float> mc_mom, RVec<float> mc_pt, RVec<float> mc_eta, RVec<float> mc_phi) {
-  float deta = 999;
-  float gamma_pt = photon_pt[0];
-  float gamma_eta = photon_eta[0];
-  float gamma_phi = photon_phi[0];
-  for (unsigned imc = 0; imc < mc_id.size(); ++imc) {
-    // Require photon to be final state and from Higgs
-    if (mc_id[imc] != 22) continue;
-    if (mc_status[imc] != 1) continue; 
-    if (mc_mom[imc] != 25) continue;
-    deta = gamma_eta - mc_eta[imc];
-    break;
-  }
-  return deta;
-}
-
-// Find gen photon from Higgs and compare with reconstructed photon
-float get_gamma_phi_diff(RVec<float> photon_pt, RVec<float> photon_eta, RVec<float> photon_phi,
-     RVec<float> mc_id, RVec<float> mc_status, RVec<float> mc_mom, RVec<float> mc_pt, RVec<float> mc_eta, RVec<float> mc_phi) {
-  float dphi = 999;
-  float gamma_pt = photon_pt[0];
-  float gamma_eta = photon_eta[0];
-  float gamma_phi = photon_phi[0];
-  for (unsigned imc = 0; imc < mc_id.size(); ++imc) {
-    // Require photon to be final state and from Higgs
-    if (mc_id[imc] != 22) continue;
-    if (mc_status[imc] != 1) continue; 
-    if (mc_mom[imc] != 25) continue;
-    dphi = TVector2::Phi_mpi_pi(gamma_phi - mc_phi[imc]);
-    break;
-  }
-  return dphi;
-}
-
-// Find gen lep plus from Higgs and compare with reconstructed lep plus
-float get_lep_plus_pt_diff(RVec<float> mu_pt, RVec<float> mu_eta, RVec<float> mu_phi, RVec<float> mu_charge,
-     RVec<float> el_pt, RVec<float> el_eta, RVec<float> el_phi, RVec<float> el_charge,
-     RVec<int> ll_lepid, RVec<int> ll_i1, RVec<int> ll_i2, RVec<int> llphoton_ill,
-     RVec<float> mc_id, RVec<float> mc_status, RVec<float> mc_mom, RVec<float> mc_pt, RVec<float> mc_eta, RVec<float> mc_phi) {
-  int lep_id = -999;
-  float lep_plus_pt = -999;
-  float lep_plus_eta = -999;
-  float lep_plus_phi = -999;
-  // Find rec lep plus
-  lep_id = ll_lepid[llphoton_ill[0]];
-  if (lep_id == 13) { // muon
-    int mu1_idx = ll_i1[llphoton_ill[0]];
-    int mu2_idx = ll_i2[llphoton_ill[0]];
-    int mu_plus_idx = -1; 
-    int mu_minus_idx = -1;
-    if (mu_charge[mu1_idx] == mu_charge[mu2_idx]) return -10;
-    if (mu_charge[mu1_idx] == 1) {
-      mu_plus_idx = mu1_idx;
-      mu_minus_idx = mu2_idx;
-    } else {
-      mu_plus_idx = mu2_idx;
-      mu_minus_idx = mu1_idx;
-    }
-    lep_plus_pt = mu_pt[mu_plus_idx];
-    lep_plus_eta = mu_eta[mu_plus_idx];
-    lep_plus_phi = mu_phi[mu_plus_idx];
-  } else { // electron
-    int el1_idx = ll_i1[llphoton_ill[0]];
-    int el2_idx = ll_i2[llphoton_ill[0]];
-    int el_plus_idx = -1; 
-    int el_minus_idx = -1;
-    if (el_charge[el1_idx] == el_charge[el2_idx]) return -10;
-    if (el_charge[el1_idx] == 1) {
-      el_plus_idx = el1_idx;
-      el_minus_idx = el2_idx;
-    } else {
-      el_plus_idx = el2_idx;
-      el_minus_idx = el1_idx;
-    }
-    lep_plus_pt = el_pt[el_plus_idx];
-    lep_plus_eta = el_eta[el_plus_idx];
-    lep_plus_phi = el_phi[el_plus_idx];
-  }
-  float dr = -999;
-  float dpt = -999;
-  // Find gen lep plus
-  for (unsigned imc = 0; imc < mc_id.size(); ++imc) {
-    // Require photon to be final state and from Higgs
-    if (mc_id[imc] != -lep_id ) continue; // Find plus charge
-    if (mc_mom[imc] != 23) continue; // Note, assumed event will have 1 Z.
-    float deta = lep_plus_eta - mc_eta[imc];
-    float dphi = TVector2::Phi_mpi_pi(lep_plus_phi - mc_phi[imc]);
-    dr = TMath::Sqrt(deta*deta + dphi*dphi);
-    dpt = lep_plus_pt - mc_pt[imc];
-    break;
-  }
-  // Limit dpt
-  if (dpt>10) dpt = 10;
-  if (dpt<-10) dpt = -10;
-  return dpt;
-}
-
-// Find gen lep plus from Higgs and compare with reconstructed lep plus
-float get_lep_plus_eta_diff(RVec<float> mu_pt, RVec<float> mu_eta, RVec<float> mu_phi, RVec<float> mu_charge,
-     RVec<float> el_pt, RVec<float> el_eta, RVec<float> el_phi, RVec<float> el_charge,
-     RVec<int> ll_lepid, RVec<int> ll_i1, RVec<int> ll_i2, RVec<int> llphoton_ill,
-     RVec<float> mc_id, RVec<float> mc_status, RVec<float> mc_mom, RVec<float> mc_pt, RVec<float> mc_eta, RVec<float> mc_phi) {
-  int lep_id = -999;
-  float lep_plus_pt = -999;
-  float lep_plus_eta = -999;
-  float lep_plus_phi = -999;
-  // Find rec lep plus
-  lep_id = ll_lepid[llphoton_ill[0]];
-  if (lep_id == 13) { // muon
-    int mu1_idx = ll_i1[llphoton_ill[0]];
-    int mu2_idx = ll_i2[llphoton_ill[0]];
-    int mu_plus_idx = -1; 
-    int mu_minus_idx = -1;
-    if (mu_charge[mu1_idx] == mu_charge[mu2_idx]) return -999;
-    if (mu_charge[mu1_idx] == 1) {
-      mu_plus_idx = mu1_idx;
-      mu_minus_idx = mu2_idx;
-    } else {
-      mu_plus_idx = mu2_idx;
-      mu_minus_idx = mu1_idx;
-    }
-    lep_plus_pt = mu_pt[mu_plus_idx];
-    lep_plus_eta = mu_eta[mu_plus_idx];
-    lep_plus_phi = mu_phi[mu_plus_idx];
-  } else { // electron
-    int el1_idx = ll_i1[llphoton_ill[0]];
-    int el2_idx = ll_i2[llphoton_ill[0]];
-    int el_plus_idx = -1; 
-    int el_minus_idx = -1;
-    if (el_charge[el1_idx] == el_charge[el2_idx]) return -999;
-    if (el_charge[el1_idx] == 1) {
-      el_plus_idx = el1_idx;
-      el_minus_idx = el2_idx;
-    } else {
-      el_plus_idx = el2_idx;
-      el_minus_idx = el1_idx;
-    }
-    lep_plus_pt = el_pt[el_plus_idx];
-    lep_plus_eta = el_eta[el_plus_idx];
-    lep_plus_phi = el_phi[el_plus_idx];
-  }
-  // Find gen lep plus
-  float deta = -999;
-  for (unsigned imc = 0; imc < mc_id.size(); ++imc) {
-    // Require photon to be final state and from Higgs
-    if (mc_id[imc] != -lep_id ) continue; // Find plus charge
-    if (mc_mom[imc] != 23) continue; // Note, assumed event will have 1 Z.
-    deta = lep_plus_eta - mc_eta[imc];
-    break;
-  }
-  return deta;
-}
-
-// Find gen lep plus from Higgs and compare with reconstructed lep plus
-float get_lep_plus_phi_diff(RVec<float> mu_pt, RVec<float> mu_eta, RVec<float> mu_phi, RVec<float> mu_charge,
-     RVec<float> el_pt, RVec<float> el_eta, RVec<float> el_phi, RVec<float> el_charge,
-     RVec<int> ll_lepid, RVec<int> ll_i1, RVec<int> ll_i2, RVec<int> llphoton_ill,
-     RVec<float> mc_id, RVec<float> mc_status, RVec<float> mc_mom, RVec<float> mc_pt, RVec<float> mc_eta, RVec<float> mc_phi) {
-  int lep_id = -999;
-  float lep_plus_pt = -999;
-  float lep_plus_eta = -999;
-  float lep_plus_phi = -999;
-  // Find rec lep plus
-  lep_id = ll_lepid[llphoton_ill[0]];
-  if (lep_id == 13) { // muon
-    int mu1_idx = ll_i1[llphoton_ill[0]];
-    int mu2_idx = ll_i2[llphoton_ill[0]];
-    int mu_plus_idx = -1; 
-    int mu_minus_idx = -1;
-    if (mu_charge[mu1_idx] == mu_charge[mu2_idx]) return -999;
-    if (mu_charge[mu1_idx] == 1) {
-      mu_plus_idx = mu1_idx;
-      mu_minus_idx = mu2_idx;
-    } else {
-      mu_plus_idx = mu2_idx;
-      mu_minus_idx = mu1_idx;
-    }
-    lep_plus_pt = mu_pt[mu_plus_idx];
-    lep_plus_eta = mu_eta[mu_plus_idx];
-    lep_plus_phi = mu_phi[mu_plus_idx];
-  } else { // electron
-    int el1_idx = ll_i1[llphoton_ill[0]];
-    int el2_idx = ll_i2[llphoton_ill[0]];
-    int el_plus_idx = -1; 
-    int el_minus_idx = -1;
-    if (el_charge[el1_idx] == el_charge[el2_idx]) return -999;
-    if (el_charge[el1_idx] == 1) {
-      el_plus_idx = el1_idx;
-      el_minus_idx = el2_idx;
-    } else {
-      el_plus_idx = el2_idx;
-      el_minus_idx = el1_idx;
-    }
-    lep_plus_pt = el_pt[el_plus_idx];
-    lep_plus_eta = el_eta[el_plus_idx];
-    lep_plus_phi = el_phi[el_plus_idx];
-  }
-  float dphi = -999;
-  // Find gen lep plus
-  for (unsigned imc = 0; imc < mc_id.size(); ++imc) {
-    // Require photon to be final state and from Higgs
-    if (mc_id[imc] != -lep_id ) continue; // Find plus charge
-    if (mc_mom[imc] != 23) continue; // Note, assumed event will have 1 Z.
-    dphi = TVector2::Phi_mpi_pi(lep_plus_phi - mc_phi[imc]);
-    break;
-  }
-  return dphi;
-}
-
-// Find gen lep minus from Higgs and compare with reconstructed lep minus
-float get_lep_minus_pt_diff(RVec<float> mu_pt, RVec<float> mu_eta, RVec<float> mu_phi, RVec<float> mu_charge,
-     RVec<float> el_pt, RVec<float> el_eta, RVec<float> el_phi, RVec<float> el_charge,
-     RVec<int> ll_lepid, RVec<int> ll_i1, RVec<int> ll_i2, RVec<int> llphoton_ill,
-     RVec<float> mc_id, RVec<float> mc_status, RVec<float> mc_mom, RVec<float> mc_pt, RVec<float> mc_eta, RVec<float> mc_phi) {
-  int lep_id = -999;
-  float lep_minus_pt = -999;
-  float lep_minus_eta = -999;
-  float lep_minus_phi = -999;
-  // Find rec lep minus
-  lep_id = ll_lepid[llphoton_ill[0]];
-  if (lep_id == 13) { // muon
-    int mu1_idx = ll_i1[llphoton_ill[0]];
-    int mu2_idx = ll_i2[llphoton_ill[0]];
-    int mu_plus_idx = -1; 
-    int mu_minus_idx = -1;
-    if (mu_charge[mu1_idx] == mu_charge[mu2_idx]) return -10;
-    if (mu_charge[mu1_idx] == 1) {
-      mu_plus_idx = mu1_idx;
-      mu_minus_idx = mu2_idx;
-    } else {
-      mu_plus_idx = mu2_idx;
-      mu_minus_idx = mu1_idx;
-    }
-    lep_minus_pt = mu_pt[mu_minus_idx];
-    lep_minus_eta = mu_eta[mu_minus_idx];
-    lep_minus_phi = mu_phi[mu_minus_idx];
-  } else { // electron
-    int el1_idx = ll_i1[llphoton_ill[0]];
-    int el2_idx = ll_i2[llphoton_ill[0]];
-    int el_plus_idx = -1; 
-    int el_minus_idx = -1;
-    if (el_charge[el1_idx] == el_charge[el2_idx]) return -10;
-    if (el_charge[el1_idx] == 1) {
-      el_plus_idx = el1_idx;
-      el_minus_idx = el2_idx;
-    } else {
-      el_plus_idx = el2_idx;
-      el_minus_idx = el1_idx;
-    }
-    lep_minus_pt = el_pt[el_minus_idx];
-    lep_minus_eta = el_eta[el_minus_idx];
-    lep_minus_phi = el_phi[el_minus_idx];
-  }
-  float dr = -999;
-  float dpt = -999;
-  // Find gen lep minus
-  for (unsigned imc = 0; imc < mc_id.size(); ++imc) {
-    // Require photon to be final state and from Higgs
-    if (mc_id[imc] != lep_id ) continue; // Find minus charge
-    if (mc_mom[imc] != 23) continue; // Note, assumed event will have 1 Z.
-    float deta = lep_minus_eta - mc_eta[imc];
-    float dphi = TVector2::Phi_mpi_pi(lep_minus_phi - mc_phi[imc]);
-    dr = TMath::Sqrt(deta*deta + dphi*dphi);
-    dpt = lep_minus_pt - mc_pt[imc];
-    break;
-  }
-  // Limit dpt
-  if (dpt>10) dpt = 10;
-  if (dpt<-10) dpt = -10;
-  return dpt;
-}
-
-// Find gen lep minus from Higgs and compare with reconstructed lep minus
-float get_lep_minus_eta_diff(RVec<float> mu_pt, RVec<float> mu_eta, RVec<float> mu_phi, RVec<float> mu_charge,
-     RVec<float> el_pt, RVec<float> el_eta, RVec<float> el_phi, RVec<float> el_charge,
-     RVec<int> ll_lepid, RVec<int> ll_i1, RVec<int> ll_i2, RVec<int> llphoton_ill,
-     RVec<float> mc_id, RVec<float> mc_status, RVec<float> mc_mom, RVec<float> mc_pt, RVec<float> mc_eta, RVec<float> mc_phi) {
-  int lep_id = -999;
-  float lep_minus_pt = -999;
-  float lep_minus_eta = -999;
-  float lep_minus_phi = -999;
-  // Find rec lep minus
-  lep_id = ll_lepid[llphoton_ill[0]];
-  if (lep_id == 13) { // muon
-    int mu1_idx = ll_i1[llphoton_ill[0]];
-    int mu2_idx = ll_i2[llphoton_ill[0]];
-    int mu_plus_idx = -1; 
-    int mu_minus_idx = -1;
-    if (mu_charge[mu1_idx] == mu_charge[mu2_idx]) return -999;
-    if (mu_charge[mu1_idx] == 1) {
-      mu_plus_idx = mu1_idx;
-      mu_minus_idx = mu2_idx;
-    } else {
-      mu_plus_idx = mu2_idx;
-      mu_minus_idx = mu1_idx;
-    }
-    lep_minus_pt = mu_pt[mu_minus_idx];
-    lep_minus_eta = mu_eta[mu_minus_idx];
-    lep_minus_phi = mu_phi[mu_minus_idx];
-  } else { // electron
-    int el1_idx = ll_i1[llphoton_ill[0]];
-    int el2_idx = ll_i2[llphoton_ill[0]];
-    int el_plus_idx = -1; 
-    int el_minus_idx = -1;
-    if (el_charge[el1_idx] == el_charge[el2_idx]) return -999;
-    if (el_charge[el1_idx] == 1) {
-      el_plus_idx = el1_idx;
-      el_minus_idx = el2_idx;
-    } else {
-      el_plus_idx = el2_idx;
-      el_minus_idx = el1_idx;
-    }
-    lep_minus_pt = el_pt[el_minus_idx];
-    lep_minus_eta = el_eta[el_minus_idx];
-    lep_minus_phi = el_phi[el_minus_idx];
-  }
-  float deta = -999;
-  // Find gen lep minus
-  for (unsigned imc = 0; imc < mc_id.size(); ++imc) {
-    // Require photon to be final state and from Higgs
-    if (mc_id[imc] != lep_id ) continue; // Find minus charge
-    if (mc_mom[imc] != 23) continue; // Note, assumed event will have 1 Z.
-    deta = lep_minus_eta - mc_eta[imc];
-    break;
-  }
-  return deta;
-}
-
-// Find gen lep minus from Higgs and compare with reconstructed lep minus
-float get_lep_minus_phi_diff(RVec<float> mu_pt, RVec<float> mu_eta, RVec<float> mu_phi, RVec<float> mu_charge,
-     RVec<float> el_pt, RVec<float> el_eta, RVec<float> el_phi, RVec<float> el_charge,
-     RVec<int> ll_lepid, RVec<int> ll_i1, RVec<int> ll_i2, RVec<int> llphoton_ill,
-     RVec<float> mc_id, RVec<float> mc_status, RVec<float> mc_mom, RVec<float> mc_pt, RVec<float> mc_eta, RVec<float> mc_phi) {
-  int lep_id = -999;
-  float lep_minus_pt = -999;
-  float lep_minus_eta = -999;
-  float lep_minus_phi = -999;
-  // Find rec lep minus
-  lep_id = ll_lepid[llphoton_ill[0]];
-  if (lep_id == 13) { // muon
-    int mu1_idx = ll_i1[llphoton_ill[0]];
-    int mu2_idx = ll_i2[llphoton_ill[0]];
-    int mu_plus_idx = -1; 
-    int mu_minus_idx = -1;
-    if (mu_charge[mu1_idx] == mu_charge[mu2_idx]) return -999;
-    if (mu_charge[mu1_idx] == 1) {
-      mu_plus_idx = mu1_idx;
-      mu_minus_idx = mu2_idx;
-    } else {
-      mu_plus_idx = mu2_idx;
-      mu_minus_idx = mu1_idx;
-    }
-    lep_minus_pt = mu_pt[mu_minus_idx];
-    lep_minus_eta = mu_eta[mu_minus_idx];
-    lep_minus_phi = mu_phi[mu_minus_idx];
-  } else { // electron
-    int el1_idx = ll_i1[llphoton_ill[0]];
-    int el2_idx = ll_i2[llphoton_ill[0]];
-    int el_plus_idx = -1; 
-    int el_minus_idx = -1;
-    if (el_charge[el1_idx] == el_charge[el2_idx]) return -999;
-    if (el_charge[el1_idx] == 1) {
-      el_plus_idx = el1_idx;
-      el_minus_idx = el2_idx;
-    } else {
-      el_plus_idx = el2_idx;
-      el_minus_idx = el1_idx;
-    }
-    lep_minus_pt = el_pt[el_minus_idx];
-    lep_minus_eta = el_eta[el_minus_idx];
-    lep_minus_phi = el_phi[el_minus_idx];
-  }
-  float dphi = -999;
-  // Find gen lep minus
-  for (unsigned imc = 0; imc < mc_id.size(); ++imc) {
-    // Require photon to be final state and from Higgs
-    if (mc_id[imc] != lep_id ) continue; // Find minus charge
-    if (mc_mom[imc] != 23) continue; // Note, assumed event will have 1 Z.
-    dphi = TVector2::Phi_mpi_pi(lep_minus_phi - mc_phi[imc]);
-    break;
-  }
-  return dphi;
-}
-
 """)
 
 if __name__=='__main__':
-  print('Start zgamma_preprocessing')
   ROOT.EnableImplicitMT()
   #parameters
-  #TODO: move generic function to /lib/
-  cuts = ['HLT_Ele23_Ele12_CaloIdL_TrackIdL_IsoVL||HLT_Ele23_Ele12_CaloIdL_TrackIdL_IsoVL_DZ||HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ',
-      'll_m.size()>0&&llphoton_m.size()>0',
-      'stitch_dy||(type/1000!=6)',
-      '(ll_m[0]>50)&&(photon_pt[0]/llphoton_m[0]>=15.0/110.0)&&((llphoton_m[0]+ll_m[0])>185)&&(photon_drmin[0]>0.4)',
-      '(ll_lepid[0]==11&&el_pt[ll_i1[0]]>25&&el_pt[ll_i2[0]]>15)||(ll_lepid[0]==13&&mu_pt[ll_i1[0]]>20&&mu_pt[ll_i2[0]]>10)',
-      #'llphoton_m[0]>120&&llphoton_m[0]<130',
-      'llphoton_m[0]>100&&llphoton_m[0]<180',
+  cuts = ['(ll_m>-999)&&(llg_m>-999)',
+      '(ll_m>50)&&(gamma_pt_over_llg_mass>=15.0/110.0)&&((llg_m+ll_m)>185)&&(min_dR_gamma_lepton>0.4)',
+      '(lead_lep_pt>25)&&(sublead_lep_pt>15)',
+      #'llg_m>120&&llg_m<130',
+      '(llg_m>100)&&(llg_m<180)',
       ]
-  #defines = [('higgsdr','llphoton_dr[0]'),('higgspt','llphoton_pt[0]'),('zpt','ll_pt[0]'),('phpt','photon_pt[0]')]
-  #branches = ('higgsdr','higgspt','zpt','phpt')
-  defines = [('photon_mva','photon_idmva[0]'),
-             ('min_dR','photon_drmin[0]'),
-             ('max_dR','get_max_dr(photon_eta,photon_phi,el_eta,el_phi,mu_eta,mu_phi,ll_lepid,ll_i1,ll_i2)'),
-             ('pt_mass','llphoton_pt[0]/llphoton_m[0]'),
-             ('cosTheta','llphoton_cosTheta[0]'),
-             ('costheta','llphoton_costheta[0]'),
-             ('phi','llphoton_phi[0]'),
-             ('photon_res','photon_pterr[0]/photon_pt[0]'),
-             ('photon_res_e','photon_pterr[0]/(photon_pt[0]*cosh(photon_eta[0]))'),
-             ('photon_rapidity','photon_eta[0]'),
-             ('l1_rapidity','get_l1_rapidity(el_pt,el_eta,mu_pt,mu_eta,ll_lepid,ll_i1,ll_i2)'),
-             ('l2_rapidity','get_l2_rapidity(el_pt,el_eta,mu_pt,mu_eta,ll_lepid,ll_i1,ll_i2)'),
-             ('decorr_photon_pt','photon_pt[0]-0.207*llphoton_m[0]'),
-             ('photon_pt_mass','photon_pt[0]/llphoton_m[0]'),
-             ('llg_mass','llphoton_m[0]'),
-             ('llg_mass_err','get_mass_err(llphoton_l1_masserr,llphoton_l2_masserr,llphoton_ph_masserr)'),
-             ('llg_flavor', 'get_flavor(ll_lepid)'),
-             ('gamma_pt', 'photon_pt[0]'),
-             ('llg_eta', 'llphoton_eta[0]'),
-             ('llg_phi', 'llphoton_phi[0]'),
-             ('llg_ptt', 'get_llg_ptt(photon_pt, photon_eta, photon_phi, llphoton_pt, llphoton_eta, llphoton_phi, ll_pt, ll_eta, ll_phi)'),
-             ('z_eta', 'll_eta[0]'),
-             ('z_phi', 'll_phi[0]'),
-             ('l1_phi', 'get_l1_phi(el_pt,el_phi,mu_pt,mu_phi,ll_lepid,ll_i1,ll_i2)'),
-             ('l2_phi', 'get_l2_phi(el_pt,el_phi,mu_pt,mu_phi,ll_lepid,ll_i1,ll_i2)'),
-             ('gamma_eta', 'photon_eta[0]'),
-             ('gamma_phi', 'photon_phi[0]'),
-             ('gamma_pt_diff', 'get_gamma_pt_diff(photon_pt, photon_eta, photon_phi, mc_id, mc_status, mc_mom, mc_pt, mc_eta, mc_phi)'),
-             ('gamma_eta_diff', 'get_gamma_eta_diff(photon_pt, photon_eta, photon_phi, mc_id, mc_status, mc_mom, mc_pt, mc_eta, mc_phi)'),
-             ('gamma_phi_diff', 'get_gamma_phi_diff(photon_pt, photon_eta, photon_phi, mc_id, mc_status, mc_mom, mc_pt, mc_eta, mc_phi)'),
-             ('lep_plus_pt_diff', 'get_lep_plus_pt_diff(mu_pt, mu_eta, mu_phi, mu_charge, el_pt, el_eta, el_phi, el_charge, ll_lepid, ll_i1, ll_i2, llphoton_ill, mc_id, mc_status, mc_mom, mc_pt, mc_eta, mc_phi)'),
-             ('lep_plus_eta_diff', 'get_lep_plus_eta_diff(mu_pt, mu_eta, mu_phi, mu_charge, el_pt, el_eta, el_phi, el_charge, ll_lepid, ll_i1, ll_i2, llphoton_ill, mc_id, mc_status, mc_mom, mc_pt, mc_eta, mc_phi)'),
-             ('lep_plus_phi_diff', 'get_lep_plus_phi_diff(mu_pt, mu_eta, mu_phi, mu_charge, el_pt, el_eta, el_phi, el_charge, ll_lepid, ll_i1, ll_i2, llphoton_ill, mc_id, mc_status, mc_mom, mc_pt, mc_eta, mc_phi)'),
-             ('lep_minus_pt_diff', 'get_lep_minus_pt_diff(mu_pt, mu_eta, mu_phi, mu_charge, el_pt, el_eta, el_phi, el_charge, ll_lepid, ll_i1, ll_i2, llphoton_ill, mc_id, mc_status, mc_mom, mc_pt, mc_eta, mc_phi)'),
-             ('lep_minus_eta_diff', 'get_lep_minus_eta_diff(mu_pt, mu_eta, mu_phi, mu_charge, el_pt, el_eta, el_phi, el_charge, ll_lepid, ll_i1, ll_i2, llphoton_ill, mc_id, mc_status, mc_mom, mc_pt, mc_eta, mc_phi)'),
-             ('lep_minus_phi_diff', 'get_lep_minus_phi_diff(mu_pt, mu_eta, mu_phi, mu_charge, el_pt, el_eta, el_phi, el_charge, ll_lepid, ll_i1, ll_i2, llphoton_ill, mc_id, mc_status, mc_mom, mc_pt, mc_eta, mc_phi)'),
+  defines = [('min_dR','min_dR_gamma_lepton'),
+             ('max_dR','max_dR_gamma_lepton'),
+             ('pt_mass','gamma_pt_over_llg_mass'),
+             ('cosTheta','llg_cosTheta'),
+             ('costheta','llg_costheta'),
+             ('phi','llg_Phi'),
+             ('photon_rapidity','gamma_eta'),
+             ('l1_rapidity','lead_lep_eta'),
+             ('l2_rapidity','sublead_lep_eta'),
+             ('photon_pt_mass','gamma_pt_over_llg_mass'),
+             ('llg_mass','llg_m'),
+             ('llg_flavor', 'e_or_mu'),
+             ('z_eta', 'll_eta'),
+             ('z_phi', 'll_phi'),
+             ('l1_phi', 'lead_lep_phi'),
+             ('l2_phi', 'sublead_lep_phi'),
              ]
-  branches = ('photon_mva','min_dR','max_dR','pt_mass','cosTheta','costheta',
-      'phi','photon_res','photon_res_e', 'photon_rapidity','l1_rapidity','l2_rapidity','decorr_photon_pt','photon_pt_mass','w_lumi', 'llg_mass', 'llg_mass_err', 'llg_flavor', 'gamma_pt',
+  branches = ('min_dR','max_dR','pt_mass','cosTheta','costheta',
+      'phi', 'photon_rapidity','l1_rapidity','l2_rapidity','photon_pt_mass', 'llg_mass', 'llg_flavor', 'gamma_pt',
       'llg_eta', 'llg_phi', 'llg_ptt', 'z_eta', 'z_phi', 'l1_phi', 'l2_phi', 'gamma_eta', 'gamma_phi', 
-      'year', 'luminosity', 'w_lumiXyear', 
-      'gamma_pt_diff', 'gamma_eta_diff', 'gamma_phi_diff',
-      'lep_plus_pt_diff', 'lep_plus_eta_diff', 'lep_plus_phi_diff',
-      'lep_minus_pt_diff', 'lep_minus_eta_diff', 'lep_minus_phi_diff',)
-  #define drmax, pt_mass, first index
-  #make n-tuples
-  #signal_files = '/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*GluGluHToZG*.root'
-  #bkg_1_files = '/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*DYJetsToLL_M-50*madgraphMLM*.root'
-  #bkg_2_files = '/Users/jbkim/Work/nn_study/pico/NanoAODv9/htozgamma_deathvalley_v3/2017/mc/skim_llg/*ZGToLLG_01J_5f*.root'
-  signal_files = []
-  bkg_files = []
-  for year in [2016, '2016APV', 2017, 2018]:
-  #for year in [2017]:
-    signal_file = f'/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/{year}/mc/skim_llg/*GluGluHToZG*M-125*.root'
-    signal_files.append(signal_file)
-    bkg_1_file = f'/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/{year}/mc/skim_llg/*DYJetsToLL_M-50*madgraphMLM*.root'
-    #bkg_1_file = f'/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/{year}/mc/skim_llg/*DYJetsToLL_M-50*amcatnloFXFX*.root'
-    bkg_2_file = f'/net/cms11/cms11r0/pico/NanoAODv9/htozgamma_deathvalley_v3/{year}/mc/skim_llg/*ZGToLLG_01J_5f_TuneCP5*.root'
-    bkg_files.append(bkg_1_file)
-    bkg_files.append(bkg_2_file)
+      'w_lumiXyear', 'w_lumi')
+  signal_files = ['input_ntuples/ntuple_ggH_HToZG_ZToLL_run02.root',
+                  'input_ntuples/ntuple_ggH_HToZG_ZToLL_run03.root',
+                  'input_ntuples/ntuple_ggH_HToZG_ZToLL_run06.root',
+                  'input_ntuples/ntuple_ggH_HToZG_ZToLL_run07.root',
+                  'input_ntuples/ntuple_ggH_HToZG_ZToLL_run08.root',
+                  'input_ntuples/ntuple_ggH_HToZG_ZToLL_run09.root',
+                  'input_ntuples/ntuple_ggH_HToZG_ZToLL_run10.root',
+                  'input_ntuples/ntuple_ggH_HToZG_ZToLL_run11.root',]
+  bkg_files = ['input_ntuples/ntuple_ZG_ZToLL_run02.root',
+               'input_ntuples/ntuple_ZG_ZToLL_run03.root',
+               'input_ntuples/ntuple_ZG_ZToLL_run06.root',
+               'input_ntuples/ntuple_ZG_ZToLL_run07.root',
+               'input_ntuples/ntuple_ZG_ZToLL_run08.root',
+               'input_ntuples/ntuple_ZG_ZToLL_run09.root',
+               'input_ntuples/ntuple_ZG_ZToLL_run10.root',
+               'input_ntuples/ntuple_ZG_ZToLL_run11.root',]
+  signal_entries = get_entries(signal_files, 'tree')
+  bkg_entries = get_entries(bkg_files, 'tree')
   write_ntuples(signal_files,
       cuts,
-      'ntuples/train_decorr_sig_run2_lumi_diff.root',
-      #'ntuples/train_decorr_sig_run2_lumi.root',
+      'processed_ntuples/train_decorr_sig_run2_lumi.root',
       #'ntuples/train_decorr_sig.root',
       defines,
       'tree',
-      branches)
+      branches,
+      signal_entries)
   write_ntuples(bkg_files,
       cuts,
-      'ntuples/train_decorr_bak_run2_lumi_diff.root',
-      #'ntuples/train_decorr_bak_run2_lumi.root',
+      'processed_ntuples/train_decorr_bak_run2_lumi.root',
       #'ntuples/train_decorr_bak.root',
       defines,
       'tree',
-      branches)
-  # Combine years
+      branches,
+      bkg_entries)
 
-  #rootutils.plot_variables('ntuples/train_decorr_sig_run2.root', 'tree', branches, out_folder = 'plots')
-  #rootutils.plot_variables('ntuples/train_decorr_bak_run2.root', 'tree', branches, out_folder = 'plots')
+  rootutils.plot_variables('processed_ntuples/train_decorr_sig_run2_lumi.root', 'tree', branches, out_folder = 'plots')
+  rootutils.plot_variables('processed_ntuples/train_decorr_bak_run2_lumi.root', 'tree', branches, out_folder = 'plots')

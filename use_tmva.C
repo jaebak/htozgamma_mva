@@ -104,7 +104,7 @@ void use_tmva() {
   // evaluate_mva = 4 is for run2 bdt
   // evaluate_mva = 5 is for reduced bdt
   // evaluate_mva = 6 is for var12 bdt
-  int evaluate_mva = 2;
+  int evaluate_mva = 1;
 
   // Load bdt tmva
   TMVA::Reader *tmva_reader = new TMVA::Reader( "!Color:!Silent" );

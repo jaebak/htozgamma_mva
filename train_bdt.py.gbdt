@@ -11,7 +11,7 @@ import numpy as np
 if __name__ == '__main__':
 
   # weight_types: 1 is decorr, 2 is use weight, 3 is weight equally, 4 is only shape decorr, 5 is no weight
-  weight_type = 3
+  weight_type = 5
 
   feature_names = ['min_dR', 'max_dR', 'pt_mass', 'cosTheta', 'costheta', 'phi',
                    'photon_rapidity', 'l1_rapidity', 'l2_rapidity',
@@ -83,6 +83,12 @@ if __name__ == '__main__':
     # Set negative weights to 0
     train_weight_array[train_weight_array<0] = 0.
 
+  # Train gradient boosted decision tree
+  print("Training gradient BDT")
+  gbdt_classifier = sklearn.ensemble.GradientBoostingClassifier(n_estimators=100, learning_rate=0.1, max_depth=3, random_state=0)
+  if use_weight: gbdt_classifier.fit(train_feature_array, train_hot_label_array[:,nlabels-1], train_weight_array)
+  else: gbdt_classifier.fit(train_feature_array, train_hot_label_array[:,nlabels-1])
+
   # Train xgboost
   print("Training xgboost")
   xgbdt_classifier = xgboost.XGBClassifier(max_depth=3, n_estimators=100)
@@ -121,6 +127,21 @@ if __name__ == '__main__':
 
 
   train_weight_array = train_dataset.spec_array[:,2]
+
+  # Boosted decision tree
+  # Predict
+  test_predict_array_gbdt_raw = gbdt_classifier.predict_proba(test_feature_array)
+  test_predict_array_gbdt = test_predict_array_gbdt_raw[:,1]
+  train_predict_array_gbdt_raw = gbdt_classifier.predict_proba(train_feature_array)
+  train_predict_array_gbdt = train_predict_array_gbdt_raw[:,1]
+  eval_predict_array_gbdt_raw = gbdt_classifier.predict_proba(eval_feature_array)
+  eval_predict_array_gbdt = eval_predict_array_gbdt_raw[:,1]
+  # Save tree
+  gbdt_root_file = uproot.recreate(gbdt_filename)
+  gbdt_root_file["test_tree"] = {'x': test_feature_array, 'y': test_label_array, 'yhat': test_predict_array_gbdt, 'mass': test_mass_array, 'weight': test_weight_array}
+  gbdt_root_file["train_tree"] = {'x': train_feature_array, 'y': train_label_array, 'yhat': train_predict_array_gbdt, 'mass': train_mass_array, 'weight': train_weight_array}
+  gbdt_root_file["test_full_tree"] = {'x': eval_feature_array, 'y': eval_label_array, 'yhat': eval_predict_array_gbdt, 'mass': eval_mass_array, 'weight': eval_weight_array}
+  print('Wrote bdt results to '+gbdt_filename)
 
   # xgboost
   # Predict
